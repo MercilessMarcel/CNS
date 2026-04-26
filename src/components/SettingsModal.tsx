@@ -233,23 +233,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <span dir="rtl">{fa.settings.cookiesSaved}</span>
               </button>
 
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                <a
-                  href="javascript:(function(){const cd=new Date();const e=Math.floor(cd.getTime()/1000)+86400*7;let o='# Netscape HTTP Cookie File\n# https://curl.se/rfc/cookie_spec.html\n# This is a generated file! Do not edit.\n\n';const c=document.cookie.split('; ');for(let i=0;i<c.length;i++){const p=c[i].indexOf('=');if(p>0){const n=c[i].substring(0,p);const v=c[i].substring(p+1);if(n&&v){o+='#HttpOnly_.youtube.com\tTRUE\t/\tTRUE\t'+e+'\t'+n+'\t'+encodeURIComponent(v)+'\n';}}}navigator.clipboard.writeText(o);alert('YouTube cookies copied! Now paste in CNS Settings.');})();"
-                  className="system-btn w-full justify-center no-underline"
-                  title="Drag to bookmarks bar"
-                >
-                  {fa.settings.bookmarkletCode}
-                </a>
-                <a
-                  href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbllbjkjfnlpehkmcjnikdf"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="system-btn w-full justify-center border-cns-highlight text-cns-highlight no-underline"
-                >
-                  {fa.settings.extensionLink}
-                </a>
-              </div>
+              <a
+                href="https://chrome.google.com/webstore/detail/get-cookiestxt-locally"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="system-btn mt-4 w-full justify-center border-cns-highlight text-cns-highlight no-underline py-4 text-sm"
+              >
+                {fa.settings.extensionLink}
+              </a>
             </div>
           </section>
         </div>
