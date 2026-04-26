@@ -97,7 +97,7 @@ function App() {
               )}
               dir="ltr"
             >
-              <Settings size={20} />
+              <Settings size={28} />
             </div>
           </div>
         </header>
