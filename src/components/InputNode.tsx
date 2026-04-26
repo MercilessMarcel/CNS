@@ -18,9 +18,9 @@ const QUALITY_OPTIONS = [
 ];
 
 const FORMAT_OPTIONS = [
+  { value: 'mp3', label: fa.format.mp3, icon: Music },
   { value: 'mp4', label: fa.format.mp4, icon: Video },
   { value: 'webm', label: fa.format.webm, icon: Video },
-  { value: 'mp3', label: fa.format.mp3, icon: Music },
 ];
 
 export function InputNode({ onSubmit, disabled }: InputNodeProps) {
