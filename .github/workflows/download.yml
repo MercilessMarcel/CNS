@@ -192,17 +192,30 @@ jobs:
                       'downloaded_at': data.get('_downloaded_at', ''),
                   }
                   
-                  # Find thumbnail
+                  # Find thumbnail - try local file first, then use URL from info.json
                   base_name = info_file.replace('.info.json', '')
                   thumb_extensions = ['.jpg', '.webp', '.png']
                   thumbnail = None
+                  
+                  # Try to find local thumbnail with matching base name
                   for ext in thumb_extensions:
                       thumb_path = f'downloads/{base_name}{ext}'
                       if os.path.exists(thumb_path):
                           thumbnail = thumb_path
                           break
                   
-                  if thumbnail:
+                  # If not found, try any jpg file in downloads (fallback)
+                  if not thumbnail:
+                      import glob
+                      jpg_files = glob.glob('downloads/*.jpg')
+                      if jpg_files:
+                          # Use the most recently modified jpg
+                          thumbnail = max(jpg_files, key=os.path.getmtime)
+                  
+                  # If still not found, use thumbnail URL from info.json
+                  if not thumbnail and 'thumbnail' in data:
+                      metadata['thumbnail'] = data['thumbnail']
+                  elif thumbnail:
                       metadata['thumbnail'] = thumbnail
                   
                   # Save metadata
