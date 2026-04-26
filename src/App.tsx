@@ -89,15 +89,17 @@ function App() {
                 <strong>{metric.value}</strong>
               </div>
             ))}
-            <button
+            <div
               onClick={() => setIsSettingsOpen(true)}
               className={cn(
                 "console-tile cursor-pointer",
                 !hasConfig && "border-cns-warning text-cns-warning"
               )}
+              dir="ltr"
             >
+              <span>SET</span>
               <Settings size={20} />
-            </button>
+            </div>
           </div>
         </header>
 
