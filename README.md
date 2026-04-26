@@ -174,6 +174,18 @@ npm run dev
 
 <div dir="rtl" align="right">
 
+
+## 🙏 قدردانی
+
+این برنامه بر اساس ایده و ساختار این مخزن‌ها ساخته شده است:
+
+- **مخزن اصلی**: [github-sandbox](https://github.com/maanimis/github-sandbox)
+- **ایده اصلی**: استفاده از GitHub Actions برای دانلود فایل‌ها
+
+- **مخزن اصلی**: [sandbox](https://github.com/nscl5/sandbox/)
+- **ایده اصلی**: تقسیم کردن ویدیو ها با استفاده از zip
+---
+
 <div align="center">
 
 <img width="1920" height="1080" alt="Cns1" src="https://github.com/user-attachments/assets/c8eb4d3d-7d47-4cb3-adb2-e2663d9ff429" />
