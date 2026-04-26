@@ -62,28 +62,38 @@ export function ArchivePanel({ refreshKey }: ArchivePanelProps) {
               const metaContent = await github.getFileContent(metaPath);
               if (metaContent) {
                 metadata = JSON.parse(metaContent.content);
+                console.log('Metadata for', item.name, ':', metadata);
                 // Convert local thumbnail path to GitHub URL
                 if (metadata.thumbnail) {
                   let thumbPath = metadata.thumbnail;
+                  console.log('Original thumbnail path:', thumbPath);
                   // Remove 'downloads/' prefix if present
                   if (thumbPath.startsWith('downloads/')) {
                     thumbPath = thumbPath.replace('downloads/', '');
                   }
+                  console.log('Cleaned thumbnail path:', thumbPath);
                   // Try to find matching file in downloads
                   const thumbFile = downloads.find(d => d.path === thumbPath || d.name === thumbPath);
+                  console.log('Found thumbnail file:', thumbFile);
                   if (thumbFile && thumbFile.download_url) {
                     metadata.thumbnail = thumbFile.download_url;
+                    console.log('Using download_url:', metadata.thumbnail);
                   } else {
                     // Fallback: construct GitHub raw URL
                     const config = github.getConfig();
                     if (config) {
                       metadata.thumbnail = `https://raw.githubusercontent.com/${config.owner}/${config.repo}/main/downloads/${thumbPath}`;
+                      console.log('Using fallback URL:', metadata.thumbnail);
                     }
                   }
+                } else {
+                  console.log('No thumbnail in metadata for', item.name);
                 }
+              } else {
+                console.log('No metadata content for', item.name);
               }
-            } catch {
-              // No metadata
+            } catch (e) {
+              console.log('Error loading metadata for', item.name, ':', e);
             }
 
             videoItems.push({
@@ -265,7 +275,9 @@ export function ArchivePanel({ refreshKey }: ArchivePanelProps) {
                     src={item.metadata.thumbnail}
                     alt=""
                     className="h-full w-full object-cover distort-img"
+                    onLoad={() => console.log('Thumbnail loaded for', item.name)}
                     onError={(e) => {
+                      console.error('Thumbnail failed to load for', item.name, ':', item.metadata?.thumbnail);
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
                   />
