@@ -105,9 +105,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <span className="text-cns-primary">{'>'}</span>
               {fa.settings.label}
             </div>
-            <p className="panel-subtitle mt-2">
-              راه‌اندازی مخزن، ثبت توکن و آپلود کوکی‌ها در یک نمای واحد و سازگار با RTL.
-            </p>
           </div>
           <div className="flex items-center gap-2">
             <span className={cn("status-pill", hasSavedConfig ? "success" : "warning")}>

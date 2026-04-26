@@ -1,11 +1,10 @@
 export const fa = {
   app: {
-    title: 'CNS :: سامانه دریافت ویدیو',
-    subtitle: 'سیستم انتقال داده مرکزی',
+    title: 'CNS'
   },
   input: {
     label: 'ورودی فرمان',
-    placeholder: 'لینک یوتیوب را وارد کنید...',
+    placeholder: 'لینک یوتیوب را وارد کنید',
     hint: 'پشتیبانی از ویدیو، پلی‌لیست و کانال',
   },
   quality: {
