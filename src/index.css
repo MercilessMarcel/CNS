@@ -648,6 +648,7 @@ body::after {
   font-family: 'Courier New', 'Consolas', 'Monaco', monospace;
   direction: ltr !important;
   min-width: 80px;
+  min-height: 70px;
   text-align: center;
 }
 
