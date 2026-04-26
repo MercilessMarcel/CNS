@@ -80,11 +80,27 @@ export function ArchivePanel({ refreshKey }: ArchivePanelProps) {
                     metadata.thumbnail = thumbFile.download_url.split('?')[0];
                     console.log('Using download_url:', metadata.thumbnail);
                   } else {
-                    // Fallback: construct GitHub raw URL without token
+                    // Fallback: use GitHub API to get raw URL with correct commit
                     const config = github.getConfig();
                     if (config) {
-                      metadata.thumbnail = `https://raw.githubusercontent.com/${config.owner}/${config.repo}/main/downloads/${encodeURIComponent(thumbPath)}`;
-                      console.log('Using fallback URL:', metadata.thumbnail);
+                      // Use api.github.com to get the file info with correct sha
+                      try {
+                        const apiUrl = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/downloads/${encodeURIComponent(thumbPath)}`;
+                        const response = await fetch(apiUrl, {
+                          headers: {
+                            'Authorization': `token ${config.token}`,
+                          },
+                        });
+                        if (response.ok) {
+                          const data = await response.json();
+                          if (data.download_url) {
+                            metadata.thumbnail = data.download_url.split('?')[0];
+                            console.log('Using API URL:', metadata.thumbnail);
+                          }
+                        }
+                      } catch (e) {
+                        console.log('API fetch failed:', e);
+                      }
                     }
                   }
                 } else {
@@ -135,10 +151,25 @@ export function ArchivePanel({ refreshKey }: ArchivePanelProps) {
                         // Strip token from download_url to avoid expiration
                         metadata.thumbnail = thumbFile.download_url.split('?')[0];
                       } else {
-                        // Fallback: construct GitHub raw URL without token
+                        // Fallback: use GitHub API to get raw URL with correct commit
                         const config = github.getConfig();
                         if (config) {
-                          metadata.thumbnail = `https://raw.githubusercontent.com/${config.owner}/${config.repo}/main/downloads/${encodeURIComponent(thumbPath)}`;
+                          try {
+                            const apiUrl = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/downloads/${encodeURIComponent(thumbPath)}`;
+                            const response = await fetch(apiUrl, {
+                              headers: {
+                                'Authorization': `token ${config.token}`,
+                              },
+                            });
+                            if (response.ok) {
+                              const data = await response.json();
+                              if (data.download_url) {
+                                metadata.thumbnail = data.download_url.split('?')[0];
+                              }
+                            }
+                          } catch (e) {
+                            console.log('API fetch failed:', e);
+                          }
                         }
                       }
                     }
