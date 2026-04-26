@@ -288,7 +288,7 @@ jobs:
                 
                 # Update metadata
                 if [ -f "\${base}.json" ]; then
-                  python3 -c "import json; f=open('\${base}.json','r'); d=json.load(f); f.close(); d['split']=True; d['parts']=\$part_count; d['original_size']=\$size; f=open('\${base}.json','w'); json.dump(d,f,indent=2); f.close()"
+                  python3 -c "import json,sys; f=open(sys.argv[1],'r'); d=json.load(f); f.close(); d['split']=True; d['parts']=int(sys.argv[2]); d['original_size']=int(sys.argv[3]); f=open(sys.argv[1],'w'); json.dump(d,f,indent=2); f.close()" "\${base}.json" "\$part_count" "\$size"
                 fi
                 
                 echo "Split into \$part_count parts"
