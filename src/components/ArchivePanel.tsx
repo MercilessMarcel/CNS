@@ -72,35 +72,26 @@ export function ArchivePanel({ refreshKey }: ArchivePanelProps) {
                     thumbPath = thumbPath.replace('downloads/', '');
                   }
                   console.log('Cleaned thumbnail path:', thumbPath);
-                  // Try to find matching file in downloads
-                  const thumbFile = downloads.find(d => d.path === thumbPath || d.name === thumbPath);
-                  console.log('Found thumbnail file:', thumbFile);
-                  if (thumbFile && thumbFile.download_url) {
-                    // Strip token from download_url to avoid expiration
-                    metadata.thumbnail = thumbFile.download_url.split('?')[0];
-                    console.log('Using download_url:', metadata.thumbnail);
-                  } else {
-                    // Fallback: fetch via GitHub API and convert to base64 data URL
-                    const config = github.getConfig();
-                    if (config) {
-                      const apiUrl = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/downloads/${encodeURIComponent(thumbPath)}`;
-                      try {
-                        const response = await fetch(apiUrl, {
-                          headers: {
-                            'Authorization': `token ${config.token}`,
-                          },
-                        });
-                        if (response.ok) {
-                          const data = await response.json();
-                          if (data.content) {
-                            const base64Content = data.content.replace(/\s/g, '');
-                            metadata.thumbnail = `data:image/jpeg;base64,${base64Content}`;
-                            console.log('Using base64 data URL');
-                          }
+                  // Always fetch thumbnail as base64 data URL
+                  const config = github.getConfig();
+                  if (config) {
+                    const apiUrl = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/downloads/${encodeURIComponent(thumbPath)}`;
+                    try {
+                      const response = await fetch(apiUrl, {
+                        headers: {
+                          'Authorization': `token ${config.token}`,
+                        },
+                      });
+                      if (response.ok) {
+                        const data = await response.json();
+                        if (data.content) {
+                          const base64Content = data.content.replace(/\s/g, '');
+                          metadata.thumbnail = `data:image/jpeg;base64,${base64Content}`;
+                          console.log('Using base64 data URL');
                         }
-                      } catch (e) {
-                        console.log('API fetch failed:', e);
                       }
+                    } catch (e) {
+                      console.log('API fetch failed:', e);
                     }
                   }
                 } else {
@@ -145,32 +136,25 @@ export function ArchivePanel({ refreshKey }: ArchivePanelProps) {
                       if (thumbPath.startsWith('downloads/')) {
                         thumbPath = thumbPath.replace('downloads/', '');
                       }
-                      // Try to find matching file in downloads
-                      const thumbFile = downloads.find(d => d.path === thumbPath || d.name === thumbPath);
-                      if (thumbFile && thumbFile.download_url) {
-                        // Strip token from download_url to avoid expiration
-                        metadata.thumbnail = thumbFile.download_url.split('?')[0];
-                      } else {
-                        // Fallback: fetch via GitHub API and convert to base64 data URL
-                        const config = github.getConfig();
-                        if (config) {
-                          const apiUrl = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/downloads/${encodeURIComponent(thumbPath)}`;
-                          try {
-                            const response = await fetch(apiUrl, {
-                              headers: {
-                                'Authorization': `token ${config.token}`,
-                              },
-                            });
-                            if (response.ok) {
-                              const data = await response.json();
-                              if (data.content) {
-                                const base64Content = data.content.replace(/\s/g, '');
-                                metadata.thumbnail = `data:image/jpeg;base64,${base64Content}`;
-                              }
+                      // Always fetch thumbnail as base64 data URL
+                      const config = github.getConfig();
+                      if (config) {
+                        const apiUrl = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/downloads/${encodeURIComponent(thumbPath)}`;
+                        try {
+                          const response = await fetch(apiUrl, {
+                            headers: {
+                              'Authorization': `token ${config.token}`,
+                            },
+                          });
+                          if (response.ok) {
+                            const data = await response.json();
+                            if (data.content) {
+                              const base64Content = data.content.replace(/\s/g, '');
+                              metadata.thumbnail = `data:image/jpeg;base64,${base64Content}`;
                             }
-                          } catch (e) {
-                            console.log('API fetch failed:', e);
                           }
+                        } catch (e) {
+                          console.log('API fetch failed:', e);
                         }
                       }
                     }
