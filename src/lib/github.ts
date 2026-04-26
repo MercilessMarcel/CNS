@@ -214,22 +214,26 @@ jobs:
       - name: Cleanup old downloads
         if: always()
         run: |
-          cd downloads || exit 0
+          # Keep only last 50 files to prevent repo bloat
+          cd downloads
           
+          # Count video files
           VIDEO_COUNT=$(ls -1 *.mp4 *.webm *.mkv *.mp3 2>/dev/null | wc -l)
           
           if [ "$VIDEO_COUNT" -gt 50 ]; then
             echo "Too many files ($VIDEO_COUNT), cleaning up old ones..."
+            # List files by modification time, skip the 50 newest
             ls -t *.mp4 *.webm *.mkv *.mp3 2>/dev/null | tail -n +51 | while read file; do
               echo "Removing old file: $file"
               rm -f "$file"
+              # Also remove associated metadata
               base="\${file%.*}"
               rm -f "\${base}.json"
               rm -f "\${base}.jpg"
             done
             
-            cd ..
-            git add downloads/
+            # Commit cleanup
+            git add -A
             git commit -m "CNS: Auto cleanup old files" || true
             git push || true
           fi
