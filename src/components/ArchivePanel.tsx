@@ -176,10 +176,12 @@ export function ArchivePanel({ refreshKey }: ArchivePanelProps) {
   const handleCombine = async (item: ArchiveItem) => {
     setCombining(item.path);
     try {
-      const base = item.path.replace(/\.[^/.]+$/, '');
+      // Extract base name from item (could be JSON path or file path)
+      const base = item.path.replace(/\.json$/, '').replace(/\.[^/.]+$/, '');
+      const baseName = base.split('/').pop() || base;
       const downloads = await github.getDownloads();
       const parts = downloads
-        .filter(d => d.type === 'file' && d.name.includes('.part') && d.name.startsWith(base))
+        .filter(d => d.type === 'file' && d.name.includes('.part') && d.name.startsWith(baseName))
         .sort((a, b) => a.name.localeCompare(b.name));
 
       if (parts.length === 0) {
