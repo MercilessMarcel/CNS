@@ -259,7 +259,7 @@ export function ArchivePanel({ refreshKey }: ArchivePanelProps) {
           className="system-btn mt-4"
         >
           <RefreshCw size={10} className={isLoading ? 'animate-spin' : ''} />
-          <span dir="rtl">{isLoading ? '...' : 'بررسی مجدد'}</span>
+          <span dir="rtl">{isLoading ? 'در حال بارگذاری' : 'بررسی مجدد'}</span>
         </button>
       </div>
     );
@@ -277,7 +277,7 @@ export function ArchivePanel({ refreshKey }: ArchivePanelProps) {
           className="system-btn"
         >
           <RefreshCw size={10} className={isLoading ? 'animate-spin' : ''} />
-          <span dir="rtl">{isLoading ? '...' : 'بروزرسانی'}</span>
+          <span dir="rtl">{isLoading ? 'در حال بارگذاری' : 'بروزرسانی'}</span>
         </button>
       </div>
 
