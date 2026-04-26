@@ -28,7 +28,6 @@ export function ArchivePanel({ refreshKey }: ArchivePanelProps) {
 
   useEffect(() => {
     loadItems();
-    // Auto-refresh every 30 seconds
     const interval = setInterval(loadItems, 30000);
     return () => clearInterval(interval);
   }, [refreshKey]);
@@ -84,7 +83,7 @@ export function ArchivePanel({ refreshKey }: ArchivePanelProps) {
     setDeleting(item.path);
     try {
       await github.deleteFile(item.path, item.sha);
-      
+
       const metaPath = item.path.replace(/\.[^/.]+$/, '.json');
       try {
         const metaContent = await github.getFileContent(metaPath);
@@ -110,107 +109,112 @@ export function ArchivePanel({ refreshKey }: ArchivePanelProps) {
 
   if (isLoading) {
     return (
-      <div className="h-full flex items-center justify-center text-cns-deep">
-        <div className="animate-flicker text-xs">SCANNING...</div>
+      <div className="empty-state h-full">
+        <div className="animate-flicker text-xs" dir="ltr">SCANNING...</div>
       </div>
     );
   }
 
   if (items.length === 0) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-cns-deep">
+      <div className="empty-state h-full flex-col">
         <div className="text-center">
           <FolderX size={32} className="mx-auto mb-2 opacity-50" />
-          <div className="text-xs">{fa.archive.empty}</div>
-          <div className="text-[10px] mt-1 opacity-50">NO_DATA</div>
+          <div className="text-sm text-cns-primary" dir="rtl">{fa.archive.empty}</div>
+          <div className="helper-copy mt-2" dir="rtl">فایل‌های دریافت‌شده پس از پایان عملیات اینجا آرشیو می‌شوند.</div>
+          <div className="mt-3 text-[10px] opacity-50" dir="ltr">NO_DATA</div>
         </div>
         <button
           onClick={loadItems}
           disabled={isLoading}
-          className="system-btn mt-4 py-1 px-3 text-[10px] flex items-center gap-1"
+          className="system-btn mt-4"
         >
           <RefreshCw size={10} className={isLoading ? 'animate-spin' : ''} />
-          {isLoading ? '...' : 'بررسی مجدد'}
+          <span dir="rtl">{isLoading ? '...' : 'بررسی مجدد'}</span>
         </button>
       </div>
     );
   }
 
   return (
-    <div className="h-[400px] overflow-y-auto space-y-2 pr-1">
-      <div className="flex justify-end mb-2">
+    <div className="h-full max-h-[560px] overflow-y-auto pr-1">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="text-[11px] text-cns-deep" dir="rtl">
+          {items.length.toLocaleString('fa-IR')} فایل آماده
+        </div>
         <button
           onClick={loadItems}
           disabled={isLoading}
-          className="system-btn py-1 px-2 text-[10px] flex items-center gap-1"
+          className="system-btn"
         >
           <RefreshCw size={10} className={isLoading ? 'animate-spin' : ''} />
-          {isLoading ? '...' : 'بروزرسانی'}
+          <span dir="rtl">{isLoading ? '...' : 'بروزرسانی'}</span>
         </button>
       </div>
-      {items.map((item) => {
-        const Icon = item.type === 'video' ? FileVideo : FileAudio;
-        
-        return (
-          <div 
-            key={item.path}
-            className="border border-cns-deep p-2 text-xs hover:border-cns-primary transition-colors"
-          >
-            {/* Thumbnail if available */}
-            {item.metadata?.thumbnail && (
-              <div className="mb-2 h-20 bg-cns-dim/30 overflow-hidden">
-                <img 
-                  src={item.metadata.thumbnail} 
-                  alt=""
-                  className="w-full h-full object-cover distort-img"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
-              </div>
-            )}
 
-            {/* File Info */}
-            <div className="flex items-start gap-2 mb-2">
-              <Icon size={14} className="text-cns-primary flex-shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <div className="text-cns-highlight truncate font-mono text-[10px]">
-                  {item.metadata?.title || item.name}
-                </div>
-                <div className="text-cns-deep text-[9px] mt-0.5">
-                  {formatSize(item.size)} // {item.type === 'video' ? fa.archive.video : fa.archive.audio}
-                </div>
-                {item.metadata?.duration && (
-                  <div className="text-cns-deep text-[9px]">
-                    {fa.meta.duration}: {item.metadata.duration}
-                  </div>
-                )}
-              </div>
-            </div>
+      <div className="space-y-3">
+        {items.map((item) => {
+          const Icon = item.type === 'video' ? FileVideo : FileAudio;
 
-            {/* Actions */}
-            <div className="flex gap-1">
-              {item.download_url && (
-                <a
-                  href={item.download_url}
-                  download
-                  className="system-btn flex-1 py-1 text-[10px] flex items-center justify-center gap-1"
-                >
-                  <Download size={10} />
-                  {fa.archive.download}
-                </a>
+          return (
+            <article key={item.path} className="archive-card">
+              {item.metadata?.thumbnail ? (
+                <div className="thumb-frame mb-3">
+                  <img
+                    src={item.metadata.thumbnail}
+                    alt=""
+                    className="h-full w-full object-cover distort-img"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="thumb-frame placeholder mb-3">
+                  <Icon size={18} />
+                  <span dir="ltr">{item.type === 'video' ? 'VIDEO_BUFFER' : 'AUDIO_BUFFER'}</span>
+                </div>
               )}
-              <button
-                onClick={() => handleDelete(item)}
-                disabled={deleting === item.path}
-                className="system-btn py-1 px-2 text-[10px] text-cns-warning border-cns-warning hover:bg-cns-warning/10"
-              >
-                <Trash2 size={10} />
-              </button>
-            </div>
-          </div>
-        );
-      })}
+
+              <div className="flex items-start gap-2">
+                <Icon size={14} className="mt-0.5 flex-shrink-0 text-cns-primary" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-mono text-[11px] text-cns-highlight" dir="ltr">
+                    {item.metadata?.title || item.name}
+                  </div>
+                  <div className="helper-copy mt-1 break-all" dir="ltr">{item.name}</div>
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2 text-[10px]">
+                <span className="system-flag" dir="ltr">{formatSize(item.size)}</span>
+                <span className="system-flag" dir="rtl">{item.type === 'video' ? fa.archive.video : fa.archive.audio}</span>
+                {item.metadata?.duration && <span className="system-flag" dir="ltr">{item.metadata.duration}</span>}
+              </div>
+
+              <div className="mt-3 flex gap-2">
+                {item.download_url && (
+                  <a
+                    href={item.download_url}
+                    download
+                    className="system-btn flex-1 justify-center"
+                  >
+                    <Download size={10} />
+                    <span dir="rtl">{fa.archive.download}</span>
+                  </a>
+                )}
+                <button
+                  onClick={() => handleDelete(item)}
+                  disabled={deleting === item.path}
+                  className="system-btn border-cns-warning text-cns-warning hover:bg-cns-warning/10"
+                >
+                  <Trash2 size={10} />
+                </button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
     </div>
   );
 }
