@@ -635,6 +635,8 @@ body::after {
 .console-tile {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 0.45rem;
   padding: 0.8rem 0.9rem;
   border: 1px solid var(--cns-line-soft);
