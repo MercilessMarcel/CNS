@@ -19,8 +19,36 @@
 }
 
 html {
-  direction: rtl;
+  direction: ltr;
   scroll-behavior: smooth;
+}
+
+body {
+  direction: rtl;
+}
+
+/* Force scrollbars to right side in RTL */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--cns-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cns-line);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cns-line-bright);
+}
+
+/* For Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--cns-line) var(--cns-bg);
 }
 
 body {
