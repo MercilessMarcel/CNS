@@ -392,7 +392,7 @@ function PartsModal({ item, onClose }: { item: ArchiveItem; onClose: () => void 
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-cns-bg border border-cns-primary/30 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden">
+      <div className="bg-cns-bg border border-cns-primary/30 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden" dir="ltr">
         <div className="p-4 border-b border-cns-primary/30 flex items-center justify-between">
           <div>
             <h3 className="text-sm text-cns-highlight font-mono" dir="ltr">{item.name}</h3>
@@ -402,7 +402,7 @@ function PartsModal({ item, onClose }: { item: ArchiveItem; onClose: () => void 
             <X size={14} />
           </button>
         </div>
-        <div className="p-4 overflow-y-auto max-h-[60vh]">
+        <div className="p-4 overflow-y-auto max-h-[60vh]" dir="rtl">
           {loading ? (
             <div className="text-center text-xs text-cns-primary" dir="rtl">در حال بارگذاری...</div>
           ) : parts.length === 0 ? (

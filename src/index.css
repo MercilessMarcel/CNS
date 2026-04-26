@@ -1050,6 +1050,7 @@ body::after {
 .modal-shell {
   max-height: min(92vh, 980px);
   overflow: auto;
+  direction: ltr;
 }
 
 .modal-popup {

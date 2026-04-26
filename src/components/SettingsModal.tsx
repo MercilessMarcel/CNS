@@ -98,7 +98,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         onClick={onClose}
       />
 
-      <div className="modal-shell modal-popup relative w-full max-w-3xl cns-panel corner-accent bg-cns-bg">
+      <div className="modal-shell modal-popup relative w-full max-w-3xl cns-panel corner-accent bg-cns-bg" dir="ltr">
         <div className="panel-head border-b border-cns-deep/70 px-5 py-4">
           <div>
             <div className="section-label">
