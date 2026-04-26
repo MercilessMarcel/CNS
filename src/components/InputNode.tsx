@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Play, Music, Video, Check } from 'lucide-react';
 import { fa } from '../lib/i18n';
-import { DownloadJob, github } from '../lib/github';
+import { DownloadJob, github, CNSError } from '../lib/github';
 import { cn } from '../lib/utils';
 
 interface InputNodeProps {
@@ -68,7 +68,25 @@ export function InputNode({ onSubmit, disabled }: InputNodeProps) {
       onSubmit(job);
       setUrl('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : fa.errors.network);
+      if (err instanceof Error) {
+        // Check for specific error patterns
+        const message = err.message;
+        if (message.includes('cookies.txt')) {
+          setError('کوکی‌های یوتیوب یافت نشد. ابتدا در تنظیمات کوکی‌ها را آپلود کنید.');
+        } else if (message.includes('Invalid GitHub token')) {
+          setError('توکن گیت‌هاب نامعتبر است. توکن را بررسی کنید.');
+        } else if (message.includes('Workflow not found')) {
+          setError('Workflow یافت نشد. راه‌اندازی خودکار را اجرا کنید.');
+        } else if (message.includes('Rate limited')) {
+          setError('محدودیت نرخ درخواست. چند دقیقه صبر کنید.');
+        } else if (message.includes('Invalid URL')) {
+          setError('آدرس ویدیو نامعتبر است.');
+        } else {
+          setError(message);
+        }
+      } else {
+        setError(fa.errors.network);
+      }
     } finally {
       setIsLoading(false);
     }
