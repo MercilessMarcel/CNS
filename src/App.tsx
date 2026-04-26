@@ -80,60 +80,26 @@ function App() {
       <div className="shell-glow" />
 
       <div className="relative mx-auto max-w-7xl">
-        <header className="hero-shell corner-accent mb-6">
-          <div className="hero-grid">
-            <div className="hero-stack">
-              {(activeJobs > 0 || hasConfig) && (
-                <div className="flex flex-wrap items-center gap-2">
-                  {activeJobs > 0 && (
-                    <span className="status-pill success" dir="rtl">
-                      <span className="status-dot" />
-                      {`${activeJobs.toLocaleString('fa-IR')} سیگنال فعال`}
-                    </span>
-                  )}
-                  {hasConfig && (
-                    <span className="status-pill success" dir="rtl">
-                      اتصال گیت‌هاب برقرار
-                    </span>
-                  )}
+        <header className="flex items-center justify-between mb-6 p-4 border border-cns-primary/30 rounded-lg bg-cns-bg">
+          <h1 className="text-lg font-mono text-cns-highlight" dir="rtl">{fa.app.title}</h1>
+          <div className="flex items-center gap-3">
+            <div className="flex gap-2">
+              {heroMetrics.map((metric) => (
+                <div key={metric.label} className="console-tile" dir="ltr">
+                  <span>{metric.label}</span>
+                  <strong>{metric.value}</strong>
                 </div>
+              ))}
+            </div>
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className={cn(
+                "system-btn",
+                !hasConfig && "border-cns-warning text-cns-warning"
               )}
-
-              <div className="space-y-3">
-                <h1 className="hero-title" dir="rtl">
-                  {fa.app.title}
-                </h1>
-                <div className="hero-commandline">
-                  <span className="hero-command" dir="rtl">
-                    {hasConfig
-                      ? 'لینک را ثبت کنید، کیفیت را انتخاب کنید و اجرا را از همین صفحه دنبال کنید.'
-                      : 'راه‌اندازی اولیه را کامل کنید تا گره دریافت فعال شود.'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="hero-console">
-              <div className="console-grid">
-                {heroMetrics.map((metric) => (
-                  <div key={metric.label} className="console-tile" dir="ltr">
-                    <span>{metric.label}</span>
-                    <strong>{metric.value}</strong>
-                  </div>
-                ))}
-              </div>
-
-              <button
-                onClick={() => setIsSettingsOpen(true)}
-                className={cn(
-                  "system-btn w-full justify-center",
-                  !hasConfig && "border-cns-warning text-cns-warning"
-                )}
-              >
-                <Settings size={14} className="ml-2" />
-                <span dir="rtl">{fa.actions.settings}</span>
-              </button>
-            </div>
+            >
+              <Settings size={14} />
+            </button>
           </div>
         </header>
 
