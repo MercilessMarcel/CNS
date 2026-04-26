@@ -63,11 +63,22 @@ export function ArchivePanel({ refreshKey }: ArchivePanelProps) {
               if (metaContent) {
                 metadata = JSON.parse(metaContent.content);
                 // Convert local thumbnail path to GitHub URL
-                if (metadata.thumbnail && metadata.thumbnail.startsWith('downloads/')) {
-                  const thumbPath = metadata.thumbnail.replace('downloads/', '');
-                  const thumbFile = downloads.find(d => d.path === thumbPath);
+                if (metadata.thumbnail) {
+                  let thumbPath = metadata.thumbnail;
+                  // Remove 'downloads/' prefix if present
+                  if (thumbPath.startsWith('downloads/')) {
+                    thumbPath = thumbPath.replace('downloads/', '');
+                  }
+                  // Try to find matching file in downloads
+                  const thumbFile = downloads.find(d => d.path === thumbPath || d.name === thumbPath);
                   if (thumbFile && thumbFile.download_url) {
                     metadata.thumbnail = thumbFile.download_url;
+                  } else {
+                    // Fallback: construct GitHub raw URL
+                    const config = github.getConfig();
+                    if (config) {
+                      metadata.thumbnail = `https://raw.githubusercontent.com/${config.owner}/${config.repo}/main/downloads/${thumbPath}`;
+                    }
                   }
                 }
               }
@@ -101,11 +112,22 @@ export function ArchivePanel({ refreshKey }: ArchivePanelProps) {
                     const isAudio = ['mp3', 'm4a', 'wav', 'ogg', 'flac'].includes(originalExt);
                     
                     // Convert local thumbnail path to GitHub URL
-                    if (metadata.thumbnail && metadata.thumbnail.startsWith('downloads/')) {
-                      const thumbPath = metadata.thumbnail.replace('downloads/', '');
-                      const thumbFile = downloads.find(d => d.path === thumbPath);
+                    if (metadata.thumbnail) {
+                      let thumbPath = metadata.thumbnail;
+                      // Remove 'downloads/' prefix if present
+                      if (thumbPath.startsWith('downloads/')) {
+                        thumbPath = thumbPath.replace('downloads/', '');
+                      }
+                      // Try to find matching file in downloads
+                      const thumbFile = downloads.find(d => d.path === thumbPath || d.name === thumbPath);
                       if (thumbFile && thumbFile.download_url) {
                         metadata.thumbnail = thumbFile.download_url;
+                      } else {
+                        // Fallback: construct GitHub raw URL
+                        const config = github.getConfig();
+                        if (config) {
+                          metadata.thumbnail = `https://raw.githubusercontent.com/${config.owner}/${config.repo}/main/downloads/${thumbPath}`;
+                        }
                       }
                     }
                     
