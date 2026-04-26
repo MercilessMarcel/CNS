@@ -50,11 +50,9 @@ export const fa = {
   settings: {
     label: 'پیکربندی سیستم',
     token: 'توکن دسترسی گیت‌هاب',
-    repo: 'مخزن هدف',
     save: 'ذخیره پیکربندی',
     autoSetup: 'راه‌اندازی خودکار',
     autoSetupDesc: 'با یک کلیک مخزن و workflow را بسازید',
-    manualSetup: 'یا پیکربندی دستی',
     creatingRepo: 'ایجاد مخزن...',
     addingWorkflow: 'افزودن workflow...',
     cookies: 'کوکی‌های یوتیوب (الزامی)',
