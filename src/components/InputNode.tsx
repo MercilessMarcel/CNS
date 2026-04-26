@@ -149,7 +149,7 @@ export function InputNode({ onSubmit, disabled }: InputNodeProps) {
                 (disabled || isLoading) && "cursor-not-allowed opacity-50"
               )}
             >
-              <span className="min-w-0 flex-1 text-right" dir="rtl">{opt.label}</span>
+              <span className="min-w-0 flex-1 text-left" dir="ltr">{opt.label}</span>
               {quality === opt.value && <Check size={12} className="text-cns-primary" />}
             </button>
           ))}

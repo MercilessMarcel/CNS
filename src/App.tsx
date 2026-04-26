@@ -116,7 +116,7 @@ function App() {
             <div className="hero-console">
               <div className="console-grid">
                 {heroMetrics.map((metric) => (
-                  <div key={metric.label} className="console-tile">
+                  <div key={metric.label} className="console-tile" dir="ltr">
                     <span>{metric.label}</span>
                     <strong>{metric.value}</strong>
                   </div>
