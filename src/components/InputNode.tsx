@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 import { Play, Music, Video, Check } from 'lucide-react';
 import { fa } from '../lib/i18n';
-import { DownloadJob, github, CNSError } from '../lib/github';
+import { DownloadJob, github } from '../lib/github';
 import { cn } from '../lib/utils';
 
 interface InputNodeProps {
@@ -46,12 +46,11 @@ export function InputNode({ onSubmit, disabled }: InputNodeProps) {
     setError(null);
 
     try {
-      // Upload cookies if available
       const cookies = github.getCookies();
       if (cookies) {
         await github.uploadCookies(cookies);
       }
-      
+
       await github.triggerWorkflow(url, quality, format);
 
       const job: DownloadJob = {
@@ -69,7 +68,6 @@ export function InputNode({ onSubmit, disabled }: InputNodeProps) {
       setUrl('');
     } catch (err) {
       if (err instanceof Error) {
-        // Check for specific error patterns
         const message = err.message;
         if (message.includes('cookies.txt')) {
           setError('کوکی‌های یوتیوب یافت نشد. ابتدا در تنظیمات کوکی‌ها را آپلود کنید.');
@@ -92,54 +90,75 @@ export function InputNode({ onSubmit, disabled }: InputNodeProps) {
     }
   };
 
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      void handleSubmit();
+    }
+  };
+
   return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <div className="flex items-center gap-2 text-xs text-cns-deep">
-          <span className="text-cns-primary">{'>'}</span>
-          <span>URL_TARGET</span>
-        </div>
-        <input
-          type="text"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder={fa.input.placeholder}
-          disabled={disabled || isLoading}
-          className="terminal-input cursor-blink"
-        />
-        <div className="text-[10px] text-cns-deep">
-          {fa.input.hint}
+    <div className="space-y-5">
+      <div className={cn("summary-strip", disabled ? "muted" : "success")}>
+        <div className="space-y-1">
+          <div className="text-xs text-cns-primary" dir="rtl">
+            {disabled ? 'ارتباط گیت‌هاب هنوز کامل نشده است.' : 'سامانه آماده ارسال فرمان دریافت است.'}
+          </div>
+          <div className="helper-copy" dir="rtl">
+            {disabled
+              ? 'ابتدا از بخش تنظیمات، راه‌اندازی خودکار و سپس کوکی‌های یوتیوب را ثبت کنید.'
+              : 'پس از ثبت لینک، dispatch workflow بلافاصله به مخزن شما ارسال می‌شود.'}
+          </div>
         </div>
       </div>
 
-      <div className="space-y-2">
-        <div className="text-xs text-cns-deep uppercase tracking-wider">
-          {fa.quality.label}
+      <div className="hud-block">
+        <div className="flex items-center justify-between gap-3">
+          <div className="field-label" dir="rtl">نشانی منبع</div>
+          <div className="micro-label" dir="ltr">YouTube / Playlist / Channel</div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <label className="terminal-field mt-3">
+          <span className="terminal-prefix">TARGET</span>
+          <input
+            type="text"
+            dir="ltr"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={fa.input.placeholder}
+            disabled={disabled || isLoading}
+            className="terminal-input text-left"
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </label>
+        <div className="helper-copy mt-3" dir="rtl">{fa.input.hint}</div>
+      </div>
+
+      <div className="hud-block">
+        <div className="field-label" dir="rtl">{fa.quality.label}</div>
+        <div className="option-grid mt-3">
           {QUALITY_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               onClick={() => setQuality(opt.value)}
               disabled={disabled || isLoading}
               className={cn(
-                "system-flag glitch-text",
+                "option-chip",
                 quality === opt.value && "active",
-                disabled && "opacity-50 cursor-not-allowed"
+                (disabled || isLoading) && "cursor-not-allowed opacity-50"
               )}
-              data-text={opt.label}
             >
-              {opt.label}
+              <span className="min-w-0 flex-1 text-right" dir="rtl">{opt.label}</span>
+              {quality === opt.value && <Check size={12} className="text-cns-primary" />}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="space-y-2">
-        <div className="text-xs text-cns-deep uppercase tracking-wider">
-          {fa.format.label}
-        </div>
-        <div className="flex gap-2">
+      <div className="hud-block">
+        <div className="field-label" dir="rtl">{fa.format.label}</div>
+        <div className="mt-3 grid grid-cols-3 gap-2">
           {FORMAT_OPTIONS.map((opt) => {
             const Icon = opt.icon;
             return (
@@ -148,16 +167,14 @@ export function InputNode({ onSubmit, disabled }: InputNodeProps) {
                 onClick={() => setFormat(opt.value)}
                 disabled={disabled || isLoading}
                 className={cn(
-                  "system-btn flex-1 text-xs py-2 flex items-center justify-center gap-1",
-                  format === opt.value && "bg-cns-dim border-cns-primary",
-                  disabled && "opacity-50 cursor-not-allowed"
+                  "format-tile",
+                  format === opt.value && "active",
+                  (disabled || isLoading) && "cursor-not-allowed opacity-50"
                 )}
               >
-                <Icon size={12} />
-                {opt.label}
-                {format === opt.value && (
-                  <Check size={10} className="mr-1 text-cns-primary" />
-                )}
+                <Icon size={15} />
+                <span dir="rtl">{opt.label}</span>
+                {format === opt.value && <Check size={11} className="text-cns-primary" />}
               </button>
             );
           })}
@@ -165,8 +182,8 @@ export function InputNode({ onSubmit, disabled }: InputNodeProps) {
       </div>
 
       {error && (
-        <div className="border border-cns-warning bg-cns-warning/5 p-2 text-xs text-cns-warning">
-          [ERROR] {error}
+        <div className="summary-strip warning text-xs text-cns-warning">
+          <span dir="ltr">[ERROR]</span> <span dir="rtl">{error}</span>
         </div>
       )}
 
@@ -174,14 +191,12 @@ export function InputNode({ onSubmit, disabled }: InputNodeProps) {
         onClick={handleSubmit}
         disabled={disabled || isLoading}
         className={cn(
-          "system-btn w-full py-3 mt-4 glitch-text",
-          isLoading && "animate-flicker",
-          disabled && "opacity-50 cursor-not-allowed"
+          "system-btn submit-btn w-full justify-center",
+          disabled && "cursor-not-allowed opacity-50"
         )}
-        data-text={isLoading ? fa.actions.processing : fa.actions.download}
       >
-        <Play size={14} className="inline ml-2" />
-        {isLoading ? fa.actions.processing : fa.actions.download}
+        <Play size={14} className="ml-2" />
+        <span dir="rtl">{isLoading ? fa.actions.processing : fa.actions.download}</span>
       </button>
     </div>
   );
