@@ -1,5 +1,29 @@
 const API_BASE = 'https://api.github.com';
 
+// Error types for better handling
+export class CNSError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+    public retryable: boolean = false
+  ) {
+    super(message);
+    this.name = 'CNSError';
+  }
+}
+
+export const ErrorCodes = {
+  NETWORK_ERROR: 'NETWORK_ERROR',
+  RATE_LIMITED: 'RATE_LIMITED',
+  AUTH_FAILED: 'AUTH_FAILED',
+  REPO_NOT_FOUND: 'REPO_NOT_FOUND',
+  WORKFLOW_FAILED: 'WORKFLOW_FAILED',
+  COOKIES_MISSING: 'COOKIES_MISSING',
+  DOWNLOAD_FAILED: 'DOWNLOAD_FAILED',
+  INVALID_URL: 'INVALID_URL',
+  CONFIG_MISSING: 'CONFIG_MISSING',
+} as const;
+
 // Workflow YAML content embedded for auto-setup
 const WORKFLOW_YML = `name: CNS Download Video
 
