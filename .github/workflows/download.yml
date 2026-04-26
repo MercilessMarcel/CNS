@@ -246,22 +246,19 @@ jobs:
             if [ -f "$file" ]; then
               size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null || echo 0)
               if [ "$size" -gt "$MAX_SIZE" ]; then
-                echo "Compressing and splitting large file: $file ($(numfmt --to=iec-i --suffix=B $size 2>/dev/null || echo $size bytes))"
+                echo "Splitting and zipping large file: $file ($(numfmt --to=iec-i --suffix=B $size 2>/dev/null || echo $size bytes))"
                 
-                # Compress file to zip
+                # Split file into chunks first
                 base="${file%.*}"
                 ext="${file##*.}"
-                zip_file="${base}.zip"
-                zip -q "$zip_file" "$file"
+                split -b "$CHUNK_SIZE" -d -a 2 "$file" "${base}part"
                 
-                # Split zip file into 50MB chunks with numeric suffixes
-                split -b "$CHUNK_SIZE" -d -a 2 "$zip_file" "${base}part"
-                
-                # Rename parts to .zip extension
+                # Zip each chunk individually
                 part_num=1
                 for part in "${base}part"*; do
                   if [ -f "$part" ]; then
-                    mv "$part" "${base}part$(printf '%02d' $part_num).zip"
+                    zip -q "${base}part$(printf '%02d' $part_num).zip" "$part"
+                    rm -f "$part"
                     part_num=$((part_num + 1))
                   fi
                 done
@@ -269,15 +266,15 @@ jobs:
                 # Count parts
                 part_count=$(ls -1 "${base}part"*.zip 2>/dev/null | wc -l)
                 
-                # Remove original file and zip
-                rm -f "$file" "$zip_file"
+                # Remove original file
+                rm -f "$file"
                 
                 # Update metadata
                 if [ -f "${base}.json" ]; then
                   python3 -c "import json,sys; f=open(sys.argv[1],'r'); d=json.load(f); f.close(); d['split']=True; d['zip']=True; d['parts']=int(sys.argv[2]); d['original_size']=int(sys.argv[3]); d['ext']=sys.argv[4]; f=open(sys.argv[1],'w'); json.dump(d,f,indent=2); f.close()" "${base}.json" "$part_count" "$size" "$ext"
                 fi
                 
-                echo "Compressed and split into $part_count parts"
+                echo "Split and zipped into $part_count parts"
               fi
             fi
           done
