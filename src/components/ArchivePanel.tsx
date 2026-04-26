@@ -80,23 +80,21 @@ export function ArchivePanel({ refreshKey }: ArchivePanelProps) {
                     metadata.thumbnail = thumbFile.download_url.split('?')[0];
                     console.log('Using download_url:', metadata.thumbnail);
                   } else {
-                    // Fallback: use GitHub API to get raw URL with correct commit
+                    // Fallback: fetch via GitHub API with raw media type
                     const config = github.getConfig();
                     if (config) {
-                      // Use api.github.com to get the file info with correct sha
+                      const apiUrl = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/downloads/${encodeURIComponent(thumbPath)}`;
                       try {
-                        const apiUrl = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/downloads/${encodeURIComponent(thumbPath)}`;
                         const response = await fetch(apiUrl, {
                           headers: {
                             'Authorization': `token ${config.token}`,
+                            'Accept': 'application/vnd.github.v3.raw',
                           },
                         });
                         if (response.ok) {
-                          const data = await response.json();
-                          if (data.download_url) {
-                            metadata.thumbnail = data.download_url.split('?')[0];
-                            console.log('Using API URL:', metadata.thumbnail);
-                          }
+                          const blob = await response.blob();
+                          metadata.thumbnail = URL.createObjectURL(blob);
+                          console.log('Using blob URL from API');
                         }
                       } catch (e) {
                         console.log('API fetch failed:', e);
@@ -151,21 +149,20 @@ export function ArchivePanel({ refreshKey }: ArchivePanelProps) {
                         // Strip token from download_url to avoid expiration
                         metadata.thumbnail = thumbFile.download_url.split('?')[0];
                       } else {
-                        // Fallback: use GitHub API to get raw URL with correct commit
+                        // Fallback: fetch via GitHub API with raw media type
                         const config = github.getConfig();
                         if (config) {
+                          const apiUrl = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/downloads/${encodeURIComponent(thumbPath)}`;
                           try {
-                            const apiUrl = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/downloads/${encodeURIComponent(thumbPath)}`;
                             const response = await fetch(apiUrl, {
                               headers: {
                                 'Authorization': `token ${config.token}`,
+                                'Accept': 'application/vnd.github.v3.raw',
                               },
                             });
                             if (response.ok) {
-                              const data = await response.json();
-                              if (data.download_url) {
-                                metadata.thumbnail = data.download_url.split('?')[0];
-                              }
+                              const blob = await response.blob();
+                              metadata.thumbnail = URL.createObjectURL(blob);
                             }
                           } catch (e) {
                             console.log('API fetch failed:', e);
