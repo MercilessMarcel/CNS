@@ -10,11 +10,11 @@ interface InputNodeProps {
 }
 
 const QUALITY_OPTIONS = [
+  { value: 'audio', label: fa.quality.audio },
   { value: 'best', label: fa.quality.best },
   { value: '1080p', label: fa.quality['1080p'] },
   { value: '720p', label: fa.quality['720p'] },
   { value: '480p', label: fa.quality['480p'] },
-  { value: 'audio', label: fa.quality.audio },
 ];
 
 const FORMAT_OPTIONS = [
