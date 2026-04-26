@@ -46,6 +46,12 @@ export function InputNode({ onSubmit, disabled }: InputNodeProps) {
     setError(null);
 
     try {
+      // Upload cookies if available
+      const cookies = github.getCookies();
+      if (cookies) {
+        await github.uploadCookies(cookies);
+      }
+      
       await github.triggerWorkflow(url, quality, format);
 
       const job: DownloadJob = {
