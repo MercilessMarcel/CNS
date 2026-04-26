@@ -16,6 +16,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [isAutoSetup, setIsAutoSetup] = useState(false);
   const [setupStep, setSetupStep] = useState<string>('');
+  const hasSavedConfig = !!github.getConfig();
 
   useEffect(() => {
     if (isOpen) {
@@ -34,7 +35,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     }
 
     setIsSaving(true);
-    // Save token only - owner/repo set by auto-setup
     const config = github.getConfig();
     if (config) {
       github.setConfig({ token, owner: config.owner, repo: config.repo });
@@ -50,10 +50,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   const handleSaveCookies = async () => {
     if (!cookies.trim()) return;
-    
+
     localStorage.setItem('cns_cookies', cookies.trim());
-    
-    // Upload to GitHub if config exists
+
     const config = github.getConfig();
     if (config) {
       try {
@@ -62,7 +61,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         // Silent fail - will retry on next download
       }
     }
-    
+
     setCookies('');
   };
 
@@ -94,156 +93,165 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+      <div
+        className="absolute inset-0 bg-black/45 backdrop-blur-[2px]"
         onClick={onClose}
       />
 
-      {/* Modal */}
-      <div className="relative w-full max-w-md cns-panel corner-accent bg-cns-bg">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-cns-deep">
-          <div className="flex items-center gap-2">
-            <span className="text-cns-primary">{'>'}</span>
-            <span className="text-sm">{fa.settings.label}</span>
+      <div className="modal-shell modal-popup relative w-full max-w-3xl cns-panel corner-accent bg-cns-bg">
+        <div className="panel-head border-b border-cns-deep/70 px-5 py-4">
+          <div>
+            <div className="section-label">
+              <span className="text-cns-primary">{'>'}</span>
+              {fa.settings.label}
+            </div>
+            <p className="panel-subtitle mt-2">
+              راه‌اندازی مخزن، ثبت توکن و آپلود کوکی‌ها در یک نمای واحد و سازگار با RTL.
+            </p>
           </div>
-          <button 
-            onClick={onClose}
-            className="text-cns-deep hover:text-cns-primary transition-colors"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <span className={cn("status-pill", hasSavedConfig ? "success" : "warning")}>
+              {hasSavedConfig ? 'پیکربندی ذخیره شده' : 'بدون مخزن'}
+            </span>
+            <button
+              onClick={onClose}
+              className="system-btn px-3"
+            >
+              <X size={14} />
+            </button>
+          </div>
         </div>
 
-        {/* Content */}
-        <div className="p-4 space-y-4">
-          {/* Token */}
-          <div className="space-y-1">
-            <label className="text-xs text-cns-deep uppercase tracking-wider">
-              {fa.settings.token}
-            </label>
-            <input
-              type="password"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="ghp_xxxxxxxxxxxx"
-              className="terminal-input"
-            />
-            <div className="text-[10px] text-cns-deep">
-              GitHub Personal Access Token با دسترسی repo
+        <div className="grid gap-4 p-4 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] md:p-5">
+          <section className="space-y-4">
+            <div className={cn("summary-strip", hasSavedConfig ? "success" : "warning")}>
+              <div className="space-y-1">
+                <div className="text-xs text-cns-primary" dir="rtl">
+                  {hasSavedConfig
+                    ? 'این مخزن قبلا آماده شده است. در این بخش می‌توانید فقط توکن را به‌روزرسانی کنید.'
+                    : 'برای نخستین استفاده، راه‌اندازی خودکار را اجرا کنید تا مخزن و workflow ساخته شوند.'}
+                </div>
+                <div className="helper-copy" dir="rtl">
+                  ذخیره توکن بدون مخزن فعال، عملا کاربردی ندارد و رابط را آماده دانلود نمی‌کند.
+                </div>
+              </div>
             </div>
-          </div>
 
-          {/* Auto Setup Button */}
-          <div className="border border-cns-primary/30 bg-cns-primary/5 p-3 space-y-2">
-            <div className="text-xs text-cns-primary flex items-center gap-2">
-              <Zap size={14} />
-              {fa.settings.autoSetup}
+            <div className="hud-block">
+              <div className="field-label" dir="rtl">{fa.settings.token}</div>
+              <div className="helper-copy mt-2" dir="rtl">
+                GitHub Personal Access Token با دسترسی <code dir="ltr" className="inline-block">repo</code>
+              </div>
+              <label className="terminal-field mt-3">
+                <span className="terminal-prefix">TOKEN</span>
+                <input
+                  type="password"
+                  dir="ltr"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  placeholder="ghp_xxxxxxxxxxxx"
+                  className="terminal-input text-left"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </label>
             </div>
-            <div className="text-[10px] text-cns-deep">
-              {fa.settings.autoSetupDesc}
+
+            <div className="hud-block">
+              <div className="flex items-center gap-2 text-xs text-cns-primary">
+                <Zap size={14} />
+                <span dir="rtl">{fa.settings.autoSetup}</span>
+              </div>
+              <div className="helper-copy mt-2" dir="rtl">{fa.settings.autoSetupDesc}</div>
+              <button
+                onClick={handleAutoSetup}
+                disabled={isAutoSetup || !token}
+                className={cn(
+                  "system-btn mt-3 w-full justify-center border-cns-primary",
+                  isAutoSetup && "animate-flicker"
+                )}
+              >
+                {isAutoSetup ? setupStep : fa.settings.autoSetup}
+              </button>
             </div>
-            <button
-              onClick={handleAutoSetup}
-              disabled={isAutoSetup || !token}
-              className={cn(
-                "system-btn w-full py-2 text-xs border-cns-primary",
-                isAutoSetup && "animate-flicker"
+
+            {error && (
+              <div className="summary-strip warning flex items-center gap-2 text-xs text-cns-warning">
+                <AlertCircle size={14} />
+                <span dir="rtl">{error}</span>
+              </div>
+            )}
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                onClick={handleSave}
+                disabled={isSaving || !token || !hasSavedConfig}
+                className="system-btn w-full justify-center"
+              >
+                <Save size={12} />
+                <span dir="rtl">{fa.settings.save}</span>
+              </button>
+
+              {hasSavedConfig && (
+                <button
+                  onClick={handleClear}
+                  className="system-btn w-full justify-center border-cns-warning text-cns-warning hover:bg-cns-warning/10"
+                >
+                  <span dir="rtl">پاک کردن تنظیمات</span>
+                </button>
               )}
-            >
-              {isAutoSetup ? setupStep : fa.settings.autoSetup}
-            </button>
-          </div>
+            </div>
+          </section>
 
-          <div className="border-t border-cns-deep my-2" />
+          <section className="space-y-4">
+            <div className="hud-block">
+              <div className="flex items-center gap-2 text-xs text-cns-warning">
+                <AlertCircle size={14} />
+                <span dir="rtl">{fa.settings.cookies}</span>
+              </div>
+              <div className="helper-copy mt-2" dir="rtl">{fa.settings.cookiesDesc}</div>
+              <div className="helper-copy" dir="rtl">{fa.settings.cookiesWhy}</div>
 
-          {/* Cookies Section */}
-          <div className="border border-cns-warning/30 bg-cns-warning/5 p-3 space-y-2">
-            <div className="text-xs text-cns-warning flex items-center gap-2">
-              <AlertCircle size={14} />
-              {fa.settings.cookies}
-            </div>
-            <div className="text-[10px] text-cns-deep">
-              {fa.settings.cookiesDesc}
-            </div>
-            <div className="text-[10px] text-cns-deep">
-              {fa.settings.cookiesWhy}
-            </div>
-            
-            {/* Bookmarklet */}
-            <div className="text-[10px] text-cns-deep pt-1">
-              {fa.settings.bookmarklet}:
-            </div>
-            <a
-              href="javascript:(function(){const cd=new Date();const e=Math.floor(cd.getTime()/1000)+86400*7;let o='# Netscape HTTP Cookie File\n# https://curl.se/rfc/cookie_spec.html\n# This is a generated file! Do not edit.\n\n';const c=document.cookie.split('; ');for(let i=0;i<c.length;i++){const p=c[i].indexOf('=');if(p>0){const n=c[i].substring(0,p);const v=c[i].substring(p+1);if(n&&v){o+='#HttpOnly_.youtube.com\tTRUE\t/\tTRUE\t'+e+'\t'+n+'\t'+encodeURIComponent(v)+'\n';}}}navigator.clipboard.writeText(o);alert('YouTube cookies copied! Now paste in CNS Settings.');})();"
-              className="inline-block system-btn py-1 px-2 text-[10px] no-underline cursor-move"
-              title="Drag to bookmarks bar"
-            >
-              {fa.settings.bookmarkletCode}
-            </a>
-            <div className="text-[9px] text-cns-warning">
-              {fa.settings.bookmarkletWarn}
-            </div>
-            
-            {/* Extension Method */}
-            <div className="text-[10px] text-cns-deep pt-2">
-              {fa.settings.extensionMethod}:
-            </div>
-            <a
-              href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbllbjkjfnlpehkmcjnikdf"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block system-btn py-1 px-2 text-[10px] no-underline border-cns-highlight text-cns-highlight"
-            >
-              {fa.settings.extensionLink}
-            </a>
-            
-            {/* Cookies textarea */}
-            <textarea
-              value={cookies}
-              onChange={(e) => setCookies(e.target.value)}
-              placeholder={fa.settings.pasteCookies}
-              className="terminal-input font-mono text-[10px] h-20 resize-none"
-              spellCheck={false}
-            />
-            
-            <button
-              onClick={handleSaveCookies}
-              disabled={!cookies.trim()}
-              className="system-btn w-full py-1 text-[10px]"
-            >
-              {fa.settings.cookiesSaved}
-            </button>
-          </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <a
+                  href="javascript:(function(){const cd=new Date();const e=Math.floor(cd.getTime()/1000)+86400*7;let o='# Netscape HTTP Cookie File\n# https://curl.se/rfc/cookie_spec.html\n# This is a generated file! Do not edit.\n\n';const c=document.cookie.split('; ');for(let i=0;i<c.length;i++){const p=c[i].indexOf('=');if(p>0){const n=c[i].substring(0,p);const v=c[i].substring(p+1);if(n&&v){o+='#HttpOnly_.youtube.com\tTRUE\t/\tTRUE\t'+e+'\t'+n+'\t'+encodeURIComponent(v)+'\n';}}}navigator.clipboard.writeText(o);alert('YouTube cookies copied! Now paste in CNS Settings.');})();"
+                  className="system-btn w-full justify-center no-underline"
+                  title="Drag to bookmarks bar"
+                >
+                  {fa.settings.bookmarkletCode}
+                </a>
+                <a
+                  href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbllbjkjfnlpehkmcjnikdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="system-btn w-full justify-center border-cns-highlight text-cns-highlight no-underline"
+                >
+                  {fa.settings.extensionLink}
+                </a>
+              </div>
 
-          {/* Error */}
-          {error && (
-            <div className="border border-cns-warning bg-cns-warning/5 p-2 text-xs text-cns-warning flex items-center gap-2">
-              <AlertCircle size={14} />
-              {error}
+              <div className="mt-3 text-[10px] text-cns-warning" dir="rtl">
+                {fa.settings.bookmarkletWarn}
+              </div>
+
+              <textarea
+                dir="ltr"
+                value={cookies}
+                onChange={(e) => setCookies(e.target.value)}
+                placeholder={fa.settings.pasteCookies}
+                className="terminal-textarea mt-3 text-left"
+                spellCheck={false}
+              />
+
+              <button
+                onClick={handleSaveCookies}
+                disabled={!cookies.trim()}
+                className="system-btn mt-3 w-full justify-center"
+              >
+                <span dir="rtl">{fa.settings.cookiesSaved}</span>
+              </button>
             </div>
-          )}
-
-          {/* Save Token Only */}
-          <button
-            onClick={handleSave}
-            disabled={isSaving || !token}
-            className="system-btn w-full py-2 text-xs flex items-center justify-center gap-1"
-          >
-            <Save size={12} />
-            {fa.settings.save}
-          </button>
-
-          {github.getConfig() && (
-            <button
-              onClick={handleClear}
-              className="system-btn w-full py-2 text-xs text-cns-warning border-cns-warning hover:bg-cns-warning/10"
-            >
-              پاک کردن تنظیمات ذخیره شده
-            </button>
-          )}
-
+          </section>
         </div>
       </div>
     </div>
