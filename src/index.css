@@ -645,6 +645,8 @@ body::after {
   text-transform: uppercase;
   font-family: 'Courier New', 'Consolas', 'Monaco', monospace;
   direction: ltr !important;
+  min-width: 80px;
+  text-align: center;
 }
 
 .console-tile strong {
