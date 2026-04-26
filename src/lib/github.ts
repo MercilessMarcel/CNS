@@ -70,6 +70,7 @@ jobs:
           echo "Quality: $QUALITY"
           echo "Format: $FORMAT"
           
+          # Build quality options
           case "$QUALITY" in
             "best")
               QUALITY_OPT="bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"
@@ -91,83 +92,107 @@ jobs:
               ;;
           esac
           
+          # Build format options
+          COOKIE_OPT=""
+          if [ -f "cookies.txt" ]; then
+            COOKIE_OPT="--cookies cookies.txt"
+          fi
+          
           if [ "$FORMAT" = "mp3" ] || [ "$QUALITY" = "audio" ]; then
+            # Audio-only download
             OUTPUT_TEMPLATE="downloads/%(title)s.%(ext)s"
-            yt-dlp \
-              --format "$QUALITY_OPT" \
-              --extract-audio \
-              --audio-format mp3 \
-              --audio-quality 0 \
-              --output "$OUTPUT_TEMPLATE" \
-              --write-info-json \
-              --write-thumbnail \
-              --convert-thumbnails jpg \
-              --embed-thumbnail \
+            yt-dlp \\
+              --format "$QUALITY_OPT" \\
+              --extract-audio \\
+              --audio-format mp3 \\
+              --audio-quality 0 \\
+              --output "$OUTPUT_TEMPLATE" \\
+              --write-info-json \\
+              --write-thumbnail \\
+              --convert-thumbnails jpg \\
+              --embed-thumbnail \\
+              $COOKIE_OPT \\
               "$URL"
           else
+            # Video download
             OUTPUT_TEMPLATE="downloads/%(title)s.%(ext)s"
-            yt-dlp \
-              --format "$QUALITY_OPT" \
-              --merge-output-format "$FORMAT" \
-              --output "$OUTPUT_TEMPLATE" \
-              --write-info-json \
-              --write-thumbnail \
-              --convert-thumbnails jpg \
+            yt-dlp \\
+              --format "$QUALITY_OPT" \\
+              --merge-output-format "$FORMAT" \\
+              --output "$OUTPUT_TEMPLATE" \\
+              --write-info-json \\
+              --write-thumbnail \\
+              --convert-thumbnails jpg \\
+              $COOKIE_OPT \\
               "$URL"
           fi
           
           echo "Download complete"
+          
+          # Get the downloaded file name
+          DOWNLOADED_FILE=$(ls -t downloads/*.mp4 downloads/*.webm downloads/*.mkv downloads/*.mp3 2>/dev/null | head -1 || echo "")
+          if [ -n "$DOWNLOADED_FILE" ]; then
+            echo "file=$DOWNLOADED_FILE" >> $GITHUB_OUTPUT
+            echo "Downloaded: $DOWNLOADED_FILE"
+          fi
 
       - name: Extract metadata
         id: metadata
         run: |
+          # Find info JSON file
           INFO_JSON=$(ls -t downloads/*.info.json 2>/dev/null | head -1 || echo "")
           if [ -n "$INFO_JSON" ]; then
-            python3 << 'PYEOF'
-import json
-import sys
-import os
-
-info_files = [f for f in os.listdir('downloads') if f.endswith('.info.json')]
-for info_file in info_files:
-    try:
-        with open(f'downloads/{info_file}', 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        metadata = {
-            'title': data.get('title', 'Unknown'),
-            'uploader': data.get('uploader', 'Unknown'),
-            'duration': data.get('duration_string', 'Unknown'),
-            'upload_date': data.get('upload_date', 'Unknown'),
-            'view_count': data.get('view_count', 0),
-            'description': data.get('description', '')[:200],
-            'original_url': data.get('webpage_url', ''),
-        }
-        
-        base_name = info_file.replace('.info.json', '')
-        thumb_extensions = ['.jpg', '.webp', '.png']
-        thumbnail = None
-        for ext in thumb_extensions:
-            thumb_path = f'downloads/{base_name}{ext}'
-            if os.path.exists(thumb_path):
-                thumbnail = thumb_path
-                break
-        
-        if thumbnail:
-            metadata['thumbnail'] = thumbnail
-        
-        meta_file = f'downloads/{base_name}.json'
-        with open(meta_file, 'w', encoding='utf-8') as f:
-            json.dump(metadata, f, ensure_ascii=False, indent=2)
-        
-        print(f'Created metadata: {meta_file}')
-    except Exception as e:
-        print(f'Error processing {info_file}: {e}', file=sys.stderr)
-PYEOF
+            echo "Found metadata: $INFO_JSON"
+            # Create simplified metadata file
+            python3 << 'EOF'
+          import json
+          import sys
+          import os
+          
+          info_files = [f for f in os.listdir('downloads') if f.endswith('.info.json')]
+          for info_file in info_files:
+              try:
+                  with open(f'downloads/{info_file}', 'r', encoding='utf-8') as f:
+                      data = json.load(f)
+                  
+                  metadata = {
+                      'title': data.get('title', 'Unknown'),
+                      'uploader': data.get('uploader', 'Unknown'),
+                      'duration': data.get('duration_string', 'Unknown'),
+                      'upload_date': data.get('upload_date', 'Unknown'),
+                      'view_count': data.get('view_count', 0),
+                      'description': data.get('description', '')[:200],
+                      'original_url': data.get('webpage_url', ''),
+                      'downloaded_at': data.get('_downloaded_at', ''),
+                  }
+                  
+                  # Find thumbnail
+                  base_name = info_file.replace('.info.json', '')
+                  thumb_extensions = ['.jpg', '.webp', '.png']
+                  thumbnail = None
+                  for ext in thumb_extensions:
+                      thumb_path = f'downloads/{base_name}{ext}'
+                      if os.path.exists(thumb_path):
+                          thumbnail = thumb_path
+                          break
+                  
+                  if thumbnail:
+                      metadata['thumbnail'] = thumbnail
+                  
+                  # Save metadata
+                  meta_file = f'downloads/{base_name}.json'
+                  with open(meta_file, 'w', encoding='utf-8') as f:
+                      json.dump(metadata, f, ensure_ascii=False, indent=2)
+                  
+                  print(f'Created metadata: {meta_file}')
+              except Exception as e:
+                  print(f'Error processing {info_file}: {e}', file=sys.stderr)
+          EOF
           fi
 
       - name: Cleanup temp files
         run: |
+          # Remove info.json and thumbnail files (keep jpg thumbnails)
           rm -f downloads/*.info.json
           rm -f downloads/*.webp downloads/*.png
 
