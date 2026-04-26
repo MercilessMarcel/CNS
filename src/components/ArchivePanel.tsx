@@ -371,14 +371,25 @@ function PartsModal({ item, onClose }: { item: ArchiveItem; onClose: () => void 
           ) : parts.length === 0 ? (
             <div className="text-center text-xs text-cns-primary" dir="rtl">هیچ بخشی یافت نشد</div>
           ) : (
-            <div className="space-y-2">
-              {parts.map((part) => (
-                <div key={part.path} className="flex items-center justify-between p-2 bg-cns-bg/50 rounded border border-cns-primary/20">
-                  <span className="text-xs font-mono text-cns-deep" dir="ltr">{part.name}</span>
-                  <span className="text-xs text-cns-primary" dir="ltr">{(part.size / 1024 / 1024).toFixed(1)} MB</span>
-                </div>
-              ))}
-            </div>
+            <>
+              <div className="mb-4 p-3 bg-cns-bg/50 rounded border border-cns-primary/20 text-xs">
+                <p className="text-cns-highlight mb-2" dir="rtl">نحوه ترکیب فایل‌ها:</p>
+                <p className="text-cns-deep mb-1" dir="rtl">1. همه بخش‌ها را دانلود کنید</p>
+                <p className="text-cns-deep mb-1" dir="rtl">2. همه فایل‌های zip را اکسترکت کنید</p>
+                <p className="text-cns-deep mb-1" dir="rtl">3. در ترمینال اجرا کنید:</p>
+                <code className="block mt-2 p-2 bg-black/30 rounded text-cns-primary font-mono text-[10px]" dir="ltr">
+                  copy /b part01+part02+part03+... filename.mp4
+                </code>
+              </div>
+              <div className="space-y-2">
+                {parts.map((part) => (
+                  <div key={part.path} className="flex items-center justify-between p-2 bg-cns-bg/50 rounded border border-cns-primary/20">
+                    <span className="text-xs font-mono text-cns-deep" dir="ltr">{part.name}</span>
+                    <span className="text-xs text-cns-primary" dir="ltr">{(part.size / 1024 / 1024).toFixed(1)} MB</span>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
         <div className="p-4 border-t border-cns-primary/30 flex gap-2">
