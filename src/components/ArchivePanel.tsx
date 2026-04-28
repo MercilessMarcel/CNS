@@ -262,7 +262,7 @@ export function ArchivePanel({ refreshKey }: ArchivePanelProps) {
                   <img
                     src={item.metadata.thumbnail}
                     alt=""
-                    className="h-full w-full object-cover distort-img"
+                    className="h-full w-full object-cover"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}

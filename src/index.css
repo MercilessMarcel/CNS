@@ -414,10 +414,6 @@ body::after {
   box-shadow: inset 0 0 0 1px rgba(255, 59, 59, 0.04);
 }
 
-.distort-img {
-  filter: contrast(1.2) brightness(0.9) sepia(0.3) hue-rotate(50deg);
-}
-
 .system-flag {
   display: inline-block;
   padding: 0.35rem 0.55rem;
