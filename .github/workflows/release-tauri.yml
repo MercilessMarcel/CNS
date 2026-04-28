@@ -68,7 +68,10 @@ jobs:
           libsoup2.4-dev \
           libappindicator3-dev \
           librsvg2-dev \
-          patchelf
+          patchelf \
+          libfuse2 \
+          libharfbuzz0b \
+          libxcb-icccm4
 
     - name: Install frontend dependencies
       run: npm ci
