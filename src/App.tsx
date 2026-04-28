@@ -7,6 +7,8 @@ import { InputNode } from './components/InputNode';
 import { SignalFeed } from './components/SignalFeed';
 import { ArchivePanel } from './components/ArchivePanel';
 import { SettingsModal } from './components/SettingsModal';
+import { DebugPanel } from './components/DebugPanel';
+import { installDebugHooks, pushDebugEntry } from './lib/debug';
 
 const MATRIX_COLUMNS = [
   '101001011001',
@@ -29,9 +31,31 @@ function App() {
   const [hasConfig, setHasConfig] = useState(false);
   const [activeTab, setActiveTab] = useState<'input' | 'feed' | 'archive'>('input');
   const [archiveRefreshKey, setArchiveRefreshKey] = useState(0);
+  const [isDebugOpen, setIsDebugOpen] = useState(false);
+  const [debugRefreshKey, setDebugRefreshKey] = useState(0);
 
   useEffect(() => {
     setHasConfig(!!github.getConfig());
+  }, []);
+
+  useEffect(() => {
+    const teardown = installDebugHooks();
+    return teardown;
+  }, []);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'F12') {
+        event.preventDefault();
+        setIsDebugOpen((prev) => !prev);
+        setDebugRefreshKey((prev) => prev + 1);
+        pushDebugEntry('info', 'debug.toggle', 'F12 pressed');
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
   const handleJobSubmit = useCallback((job: DownloadJob) => {
@@ -186,7 +210,7 @@ function App() {
         <footer className="system-footer mt-6">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-wrap items-center gap-3">
-              <span dir="ltr">CNS v1.0.0</span>
+              <span dir="ltr">CNS v1.1.0</span>
               <span className="footer-divider" />
               <span dir="rtl">{fa.warnings.rateLimit}</span>
             </div>
@@ -208,6 +232,13 @@ function App() {
           setIsSettingsOpen(false);
           setHasConfig(!!github.getConfig());
         }}
+      />
+
+      <DebugPanel
+        isOpen={import.meta.env.DEV && isDebugOpen}
+        onClose={() => setIsDebugOpen(false)}
+        refreshKey={debugRefreshKey}
+        onClear={() => setDebugRefreshKey((prev) => prev + 1)}
       />
     </div>
   );

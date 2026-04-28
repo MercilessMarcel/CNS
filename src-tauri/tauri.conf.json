@@ -7,8 +7,8 @@
     "distDir": "../dist"
   },
   "package": {
-    "productName": "CNS YouTube Downloader",
-    "version": "1.0.0"
+    "productName": "CNS",
+    "version": "1.1.0"
   },
   "tauri": {
     "allowlist": {
@@ -29,8 +29,8 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "identifier": "com.cns.youtubedownloader",
-      "longDescription": "CNS wraps the existing React UI in a native Tauri shell so non-technical users can run the downloader as a desktop app instead of installing Node.js and starting a local dev server.",
+      "identifier": "com.cns.app",
+      "longDescription": "CNS wraps the existing React UI in a native Tauri shell so non-technical users can run the app as a desktop executable instead of installing Node.js and starting a local dev server.",
       "macOS": {
         "entitlements": null,
         "exceptionDomain": "",
@@ -40,7 +40,7 @@
       },
       "publisher": "CNS",
       "resources": [],
-      "shortDescription": "Native desktop shell for CNS YouTube Downloader",
+      "shortDescription": "Native desktop shell for CNS",
       "targets": "all",
       "windows": {
         "certificateThumbprint": null,
@@ -67,7 +67,7 @@
         "minHeight": 720,
         "minWidth": 1180,
         "resizable": true,
-        "title": "CNS YouTube Downloader",
+        "title": "CNS",
         "width": 1440
       }
     ]
