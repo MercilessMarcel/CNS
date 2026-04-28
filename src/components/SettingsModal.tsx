@@ -11,36 +11,47 @@ interface SettingsModalProps {
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [token, setToken] = useState('');
+  const [repoName, setRepoName] = useState('cns-downloads');
   const [cookies, setCookies] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAutoSetup, setIsAutoSetup] = useState(false);
   const [setupStep, setSetupStep] = useState<string>('');
-  const hasSavedConfig = !!github.getConfig();
+  const savedConfig = github.getConfig();
+  const hasSavedConfig = !!savedConfig;
 
   useEffect(() => {
     if (isOpen) {
       const config = github.getConfig();
       if (config) {
         setToken(config.token);
+        setRepoName(config.repo);
       }
       setError(null);
     }
   }, [isOpen]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!token) {
       setError('توکن گیت‌هاب الزامی است');
       return;
     }
 
     setIsSaving(true);
-    const config = github.getConfig();
-    if (config) {
-      github.setConfig({ token, owner: config.owner, repo: config.repo });
+    setError(null);
+    try {
+      const config = github.getConfig();
+      if (config) {
+        github.setConfig({ token, owner: config.owner, repo: repoName.trim() || config.repo });
+      } else {
+        const attached = await github.connectExistingRepo(token, repoName.trim() || 'cns-downloads');
+        await github.ensureWorkflow(token, attached.owner, attached.repo);
+      }
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'خطا در اتصال به مخزن موجود');
     }
     setIsSaving(false);
-    onClose();
   };
 
   const handleClear = () => {
@@ -53,13 +64,21 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
     localStorage.setItem('cns_cookies', cookies.trim());
 
-    const config = github.getConfig();
-    if (config) {
-      try {
-        await github.uploadCookies(cookies.trim());
-      } catch {
-        // Silent fail - will retry on next download
+    try {
+      let config = github.getConfig();
+      if (!config) {
+        if (!token) {
+          setError('توکن گیت‌هاب الزامی است');
+          return;
+        }
+        config = await github.connectExistingRepo(token, repoName.trim() || 'cns-downloads');
+        await github.ensureWorkflow(token, config.owner, config.repo);
       }
+      await github.uploadCookies(cookies.trim());
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'خطا در آپلود کوکی‌ها');
+      return;
     }
 
     setCookies('');
@@ -126,10 +145,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <div className="text-xs text-cns-primary" dir="rtl">
                   {hasSavedConfig
                     ? 'این مخزن قبلا آماده شده است. در این بخش می‌توانید فقط توکن را به‌روزرسانی کنید.'
-                    : 'برای نخستین استفاده، راه‌اندازی خودکار را اجرا کنید تا مخزن و workflow ساخته شوند.'}
+                    : 'اگر مخزن از قبل وجود دارد، با ذخیره پیکربندی دوباره به آن متصل شوید.'}
                 </div>
                 <div className="helper-copy" dir="rtl">
-                  ذخیره توکن بدون مخزن فعال، عملا کاربردی ندارد و رابط را آماده دانلود نمی‌کند.
+                  اگر پیکربندی محلی پاک شده باشد، ذخیره پیکربندی با توکن شما مخزن موجود را دوباره پیدا می‌کند.
                 </div>
               </div>
             </div>
@@ -137,7 +156,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <div className="hud-block">
               <div className="field-label" dir="rtl">{fa.settings.token}</div>
               <div className="helper-copy mt-2" dir="rtl">
-                GitHub Personal Access Token با دسترسی <code dir="ltr" className="inline-block">repo</code>
+                GitHub Personal Access Token با دسترسی <code dir="ltr" className="inline-block">repo</code> و <code dir="ltr" className="inline-block">workflow</code>
               </div>
               <label className="terminal-field mt-3">
                 <span className="terminal-prefix">TOKEN</span>
@@ -147,6 +166,26 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   value={token}
                   onChange={(e) => setToken(e.target.value)}
                   placeholder="ghp_xxxxxxxxxxxx"
+                  className="terminal-input text-left"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </label>
+            </div>
+
+            <div className="hud-block">
+              <div className="field-label" dir="rtl">نام مخزن</div>
+              <div className="helper-copy mt-2" dir="rtl">
+                نام پیش‌فرض همان مخزن قبلی برنامه است.
+              </div>
+              <label className="terminal-field mt-3">
+                <span className="terminal-prefix">REPO</span>
+                <input
+                  type="text"
+                  dir="ltr"
+                  value={repoName}
+                  onChange={(e) => setRepoName(e.target.value)}
+                  placeholder="cns-downloads"
                   className="terminal-input text-left"
                   autoComplete="off"
                   spellCheck={false}
@@ -170,6 +209,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               >
                 {isAutoSetup ? setupStep : fa.settings.autoSetup}
               </button>
+              <div className="helper-copy mt-2" dir="rtl">
+                این دکمه مخزن جدید می‌سازد. برای مخزن موجود، از ذخیره پیکربندی استفاده کنید.
+              </div>
             </div>
 
             {error && (
@@ -182,7 +224,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <div className="grid gap-2 sm:grid-cols-2">
               <button
                 onClick={handleSave}
-                disabled={isSaving || !token || !hasSavedConfig}
+                disabled={isSaving || !token}
                 className="system-btn w-full justify-center"
               >
                 <Save size={12} />

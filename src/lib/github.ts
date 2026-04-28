@@ -380,6 +380,67 @@ class GitHubClient {
     localStorage.removeItem('cns_github_config');
   }
 
+  private async requestWithToken(token: string, path: string, options: RequestInit = {}, retries: number = 3): Promise<any> {
+    const url = `${API_BASE}${path}`;
+    const headers = {
+      'Accept': 'application/vnd.github.v3+json',
+      'Authorization': `token ${token}`,
+      'User-Agent': 'CNS-YouTube-Downloader',
+      ...options.headers,
+    };
+
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        const response = await fetch(url, { ...options, headers });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          const message = errorData.message || `HTTP ${response.status}`;
+
+          if (response.status === 401) {
+            throw new CNSError(`Authentication failed: ${message}`, ErrorCodes.AUTH_FAILED, false);
+          }
+          if (response.status === 403) {
+            const isRateLimit = errorData.message?.includes('rate limit');
+            throw new CNSError(
+              isRateLimit ? `Rate limited: ${message}` : `Forbidden: ${message}`,
+              isRateLimit ? ErrorCodes.RATE_LIMITED : ErrorCodes.AUTH_FAILED,
+              isRateLimit
+            );
+          }
+          if (response.status === 404) {
+            throw new CNSError(`Not found: ${message}`, ErrorCodes.REPO_NOT_FOUND, false);
+          }
+          if (response.status >= 500) {
+            throw new CNSError(`Server error: ${message}`, ErrorCodes.NETWORK_ERROR, true);
+          }
+
+          throw new CNSError(`Request failed: ${message}`, ErrorCodes.NETWORK_ERROR, attempt < retries - 1);
+        }
+
+        if (response.status === 204) {
+          return null;
+        }
+
+        return response.json();
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+
+        if (err instanceof CNSError && !err.retryable) {
+          throw err;
+        }
+
+        if (attempt < retries - 1) {
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        }
+      }
+    }
+
+    throw lastError || new CNSError('Request failed after retries', ErrorCodes.NETWORK_ERROR, false);
+  }
+
   private async requestWithRetry(path: string, options: RequestInit = {}, retries: number = 3): Promise<any> {
     const config = this.getConfig();
     if (!config) throw new CNSError('GitHub config not set', ErrorCodes.CONFIG_MISSING, false);
@@ -608,6 +669,27 @@ class GitHubClient {
       };
     } catch {
       return null;
+    }
+  }
+
+  async connectExistingRepo(token: string, repoName: string = 'cns-downloads'): Promise<GitHubConfig> {
+    const user = await this.requestWithToken(token, '/user');
+    await this.requestWithToken(token, `/repos/${user.login}/${repoName}`);
+
+    const config: GitHubConfig = { token, owner: user.login, repo: repoName };
+    this.setConfig(config);
+    return config;
+  }
+
+  async ensureWorkflow(token: string, owner: string, repo: string): Promise<void> {
+    try {
+      await this.requestWithToken(token, `/repos/${owner}/${repo}/contents/.github/workflows/download.yml`);
+    } catch (err) {
+      if (err instanceof CNSError && err.code === ErrorCodes.REPO_NOT_FOUND) {
+        await this.setupWorkflow(token, owner, repo);
+        return;
+      }
+      throw err;
     }
   }
 

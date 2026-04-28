@@ -59,7 +59,7 @@ export const fa = {
     cookiesWhy: 'کوکی‌ها باید از مرورگر شما استخراج شوند',
     bookmarklet: 'روش 1: کشیدن این دکمه به نوار نشانک‌ها',
     bookmarkletCode: 'Export YT Cookies',
-    bookmarkletWarn: 'توجه: این روش ممکن است کار نکند - کوکی‌های مهم قابل دسترسی نیستند',
+    bookmarkletWarn: 'کوکی‌های یوتیوب بعد از مدتی منقضی می‌شوند و باید دوباره در این بخش وارد شوند.',
     extensionMethod: 'روش 2: افزونه cookies.txt (توصیه شده)',
     extensionLink: 'Chrome Web Store',
     pasteCookies: 'محتوای فایل cookies.txt را اینجا بچسبانید',
