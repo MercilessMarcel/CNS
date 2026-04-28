@@ -1,12 +1,19 @@
 {
   "name": "cns-youtube-downloader",
   "version": "1.0.0",
+  "description": "Desktop-first YouTube downloader UI powered by GitHub Actions and Tauri",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "desktop:dev": "npm run tauri:dev",
+    "desktop:build": "npm run tauri:build",
+    "desktop:build:portable": "npm run build && cargo build --manifest-path src-tauri/Cargo.toml --release --features custom-protocol"
   },
   "dependencies": {
     "clsx": "^2.0.0",
@@ -17,6 +24,8 @@
     "tailwind-merge": "^2.0.0"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^1.6.0",
+    "@tauri-apps/api": "^1.6.0",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.7.0",

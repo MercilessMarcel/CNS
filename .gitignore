@@ -45,3 +45,6 @@ coverage/
 *.tmp
 *.temp
 .cache/
+
+# Rust / Tauri
+src-tauri/target/
