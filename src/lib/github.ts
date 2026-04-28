@@ -1,83 +1,4 @@
-import { Body, ResponseType, fetch as tauriFetch } from '@tauri-apps/api/http';
-import { logDebug } from './debug';
-
 const API_BASE = 'https://api.github.com';
-
-interface HttpResponse {
-  ok: boolean;
-  status: number;
-  text: string;
-}
-
-interface HttpRequestOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
-  headers?: Record<string, string>;
-  body?: string;
-}
-
-function parseJsonSafely(text: string) {
-  if (!text) return {};
-  try {
-    return JSON.parse(text);
-  } catch {
-    return {};
-  }
-}
-
-function isTauriRuntime() {
-  return typeof window !== 'undefined' && '__TAURI_IPC__' in window;
-}
-
-function sanitizeHeaders(headers: Record<string, string> = {}) {
-  const next = { ...headers };
-  if (!isTauriRuntime()) {
-    delete next['User-Agent'];
-  }
-  return next;
-}
-
-async function httpRequest(url: string, options: HttpRequestOptions = {}): Promise<HttpResponse> {
-  const headers = sanitizeHeaders(options.headers);
-  logDebug('http', 'request:start', {
-    runtime: isTauriRuntime() ? 'tauri' : 'web',
-    method: options.method ?? 'GET',
-    url,
-    headers: Object.keys(headers),
-  });
-
-  if (isTauriRuntime()) {
-    const response = await tauriFetch<string>(url, {
-      method: options.method ?? 'GET',
-      headers,
-      body: options.body !== undefined ? Body.text(options.body) : undefined,
-      responseType: ResponseType.Text,
-    });
-    const text = typeof response.data === 'string'
-      ? response.data
-      : response.data == null
-        ? ''
-        : JSON.stringify(response.data);
-    logDebug('http', 'request:end', { method: options.method ?? 'GET', url, status: response.status, ok: response.ok });
-    return {
-      ok: response.ok,
-      status: response.status,
-      text,
-    };
-  }
-
-  const response = await fetch(url, {
-    method: options.method ?? 'GET',
-    headers,
-    body: options.body,
-  });
-  const text = await response.text();
-  logDebug('http', 'request:end', { method: options.method ?? 'GET', url, status: response.status, ok: response.ok });
-  return {
-    ok: response.ok,
-    status: response.status,
-    text,
-  };
-}
 
 // Error types for better handling
 export class CNSError extends Error {
@@ -448,12 +369,8 @@ class GitHubClient {
     if (this.config) return this.config;
     const stored = localStorage.getItem('cns_github_config');
     if (stored) {
-      try {
-        this.config = JSON.parse(stored);
-        return this.config;
-      } catch (error) {
-        logDebug('config', 'failed to parse stored config', { error: String(error) });
-      }
+      this.config = JSON.parse(stored);
+      return this.config;
     }
     return null;
   }
@@ -463,14 +380,14 @@ class GitHubClient {
     localStorage.removeItem('cns_github_config');
   }
 
-  private async requestWithRetry(path: string, options: HttpRequestOptions = {}, retries: number = 3): Promise<any> {
+  private async requestWithRetry(path: string, options: RequestInit = {}, retries: number = 3): Promise<any> {
     const config = this.getConfig();
     if (!config) throw new CNSError('GitHub config not set', ErrorCodes.CONFIG_MISSING, false);
 
     const url = `${API_BASE}${path}`;
     const headers = {
       'Accept': 'application/vnd.github.v3+json',
-      'Authorization': `Bearer ${config.token}`,
+      'Authorization': `token ${config.token}`,
       'User-Agent': 'CNS-YouTube-Downloader',
       ...options.headers,
     };
@@ -479,10 +396,10 @@ class GitHubClient {
 
     for (let attempt = 0; attempt < retries; attempt++) {
       try {
-        const response = await httpRequest(url, { ...options, headers });
+        const response = await fetch(url, { ...options, headers });
         
         if (!response.ok) {
-          const errorData = parseJsonSafely(response.text);
+          const errorData = await response.json().catch(() => ({}));
           const message = errorData.message || `HTTP ${response.status}`;
           
           // Handle specific error codes
@@ -508,14 +425,13 @@ class GitHubClient {
         }
 
         // Handle 204 No Content
-        if (response.status === 204 || !response.text) {
+        if (response.status === 204) {
           return null;
         }
 
-        return JSON.parse(response.text);
+        return response.json();
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
-        logDebug('github', 'request retry/fail', { path, attempt: attempt + 1, error: lastError.message });
         
         // Don't retry on auth errors or 404s
         if (err instanceof CNSError && !err.retryable) {
@@ -532,7 +448,7 @@ class GitHubClient {
     throw lastError || new CNSError('Request failed after retries', ErrorCodes.NETWORK_ERROR, false);
   }
 
-  private async request(path: string, options: HttpRequestOptions = {}): Promise<any> {
+  private async request(path: string, options: RequestInit = {}): Promise<any> {
     return this.requestWithRetry(path, options, 3);
   }
 
@@ -562,11 +478,11 @@ class GitHubClient {
     const url_path = `${API_BASE}/repos/${config.owner}/${config.repo}/actions/workflows/download.yml/dispatches`;
     
     try {
-      const response = await httpRequest(url_path, {
+      const response = await fetch(url_path, {
         method: 'POST',
         headers: {
           'Accept': 'application/vnd.github.v3+json',
-          'Authorization': `Bearer ${config.token}`,
+          'Authorization': `token ${config.token}`,
           'Content-Type': 'application/json',
           'User-Agent': 'CNS-YouTube-Downloader',
         },
@@ -581,7 +497,7 @@ class GitHubClient {
       });
 
       if (!response.ok) {
-        const errorData = parseJsonSafely(response.text);
+        const errorData = await response.json().catch(() => ({}));
         const message = errorData.message || `HTTP ${response.status}`;
         
         if (response.status === 401) {
@@ -603,7 +519,6 @@ class GitHubClient {
       return response.status;
     } catch (err) {
       if (err instanceof CNSError) throw err;
-      logDebug('github', 'triggerWorkflow failed', { error: err instanceof Error ? err.message : String(err) });
       throw new CNSError(`Network error: ${err instanceof Error ? err.message : 'Unknown error'}`, ErrorCodes.NETWORK_ERROR, true);
     }
   }
@@ -623,18 +538,18 @@ class GitHubClient {
     if (!config) throw new Error('GitHub config not set');
 
     try {
-      const response = await httpRequest(
+      const response = await fetch(
         `${API_BASE}/repos/${config.owner}/${config.repo}/actions/runs/${runId}/logs`,
         {
           headers: {
             'Accept': 'application/vnd.github.v3+json',
-            'Authorization': `Bearer ${config.token}`,
+            'Authorization': `token ${config.token}`,
           },
         }
       );
       
       if (!response.ok) return '';
-      return response.text;
+      return await response.text();
     } catch {
       return '';
     }
@@ -699,11 +614,11 @@ class GitHubClient {
   // Auto-setup: Create repo and workflow file
   async createRepo(name: string, token: string): Promise<{ owner: string; repo: string }> {
     // Create repo using user endpoint
-    const response = await httpRequest(`${API_BASE}/user/repos`, {
+    const response = await fetch(`${API_BASE}/user/repos`, {
       method: 'POST',
       headers: {
         'Accept': 'application/vnd.github.v3+json',
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `token ${token}`,
         'Content-Type': 'application/json',
         'User-Agent': 'CNS-YouTube-Downloader',
       },
@@ -716,12 +631,11 @@ class GitHubClient {
     });
 
     if (!response.ok) {
-      const error = parseJsonSafely(response.text);
-      logDebug('github', 'createRepo failed', { status: response.status, error });
+      const error = await response.json().catch(() => ({}));
       throw new Error(error.message || `Failed to create repo: HTTP ${response.status}`);
     }
 
-    const data = JSON.parse(response.text);
+    const data = await response.json();
     return { owner: data.owner.login, repo: data.name };
   }
 
@@ -730,11 +644,11 @@ class GitHubClient {
     const path = '.github/workflows/download.yml';
     const content = btoa(WORKFLOW_YML);
     
-    const response = await httpRequest(`${API_BASE}/repos/${owner}/${repo}/contents/${path}`, {
+    const response = await fetch(`${API_BASE}/repos/${owner}/${repo}/contents/${path}`, {
       method: 'PUT',
       headers: {
         'Accept': 'application/vnd.github.v3+json',
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `token ${token}`,
         'Content-Type': 'application/json',
         'User-Agent': 'CNS-YouTube-Downloader',
       },
@@ -745,8 +659,7 @@ class GitHubClient {
     });
 
     if (!response.ok) {
-      const error = parseJsonSafely(response.text);
-      logDebug('github', 'setupWorkflow failed', { status: response.status, error });
+      const error = await response.json().catch(() => ({}));
       throw new Error(error.message || `Failed to setup workflow: HTTP ${response.status}`);
     }
   }
@@ -798,11 +711,11 @@ class GitHubClient {
     };
     if (sha) body.sha = sha;
 
-    const response = await httpRequest(`${API_BASE}/repos/${config.owner}/${config.repo}/contents/${path}`, {
+    const response = await fetch(`${API_BASE}/repos/${config.owner}/${config.repo}/contents/${path}`, {
       method: 'PUT',
       headers: {
         'Accept': 'application/vnd.github.v3+json',
-        'Authorization': `Bearer ${config.token}`,
+        'Authorization': `token ${config.token}`,
         'Content-Type': 'application/json',
         'User-Agent': 'CNS-YouTube-Downloader',
       },
@@ -810,8 +723,7 @@ class GitHubClient {
     });
 
     if (!response.ok) {
-      const error = parseJsonSafely(response.text);
-      logDebug('github', 'uploadCookies failed', { status: response.status, error });
+      const error = await response.json().catch(() => ({}));
       throw new Error(error.message || `Failed to upload cookies: HTTP ${response.status}`);
     }
   }

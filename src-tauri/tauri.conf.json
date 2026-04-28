@@ -12,14 +12,7 @@
   },
   "tauri": {
     "allowlist": {
-      "all": false,
-      "http": {
-        "all": false,
-        "request": true,
-        "scope": [
-          "https://api.github.com/**"
-        ]
-      }
+      "all": false
     },
     "bundle": {
       "active": true,

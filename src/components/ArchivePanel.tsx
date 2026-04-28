@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Download, Trash2, FileVideo, FileAudio, FolderX, RefreshCw, Package, X } from 'lucide-react';
 import { fa } from '../lib/i18n';
 import { github } from '../lib/github';
-import { logDebug } from '../lib/debug';
 
 interface ArchiveItem {
   name: string;
@@ -80,7 +79,7 @@ export function ArchivePanel({ refreshKey }: ArchivePanelProps) {
                     try {
                       const response = await fetch(apiUrl, {
                         headers: {
-                          'Authorization': `Bearer ${config.token}`,
+                          'Authorization': `token ${config.token}`,
                         },
                       });
                       if (response.ok) {
@@ -92,7 +91,7 @@ export function ArchivePanel({ refreshKey }: ArchivePanelProps) {
                         }
                       }
                     } catch (e) {
-                      logDebug('archive', 'thumbnail fetch failed', { error: String(e), path: thumbPath });
+                      console.log('API fetch failed:', e);
                     }
                   }
                 } else {
@@ -144,7 +143,7 @@ export function ArchivePanel({ refreshKey }: ArchivePanelProps) {
                         try {
                           const response = await fetch(apiUrl, {
                             headers: {
-                              'Authorization': `Bearer ${config.token}`,
+                              'Authorization': `token ${config.token}`,
                             },
                           });
                           if (response.ok) {

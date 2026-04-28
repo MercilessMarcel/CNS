@@ -3,7 +3,6 @@ import { Play, Music, Video } from 'lucide-react';
 import { fa } from '../lib/i18n';
 import { DownloadJob, github } from '../lib/github';
 import { cn } from '../lib/utils';
-import { formatDebugEntries, logDebug } from '../lib/debug';
 
 interface InputNodeProps {
   onSubmit: (job: DownloadJob) => void;
@@ -68,10 +67,6 @@ export function InputNode({ onSubmit, disabled }: InputNodeProps) {
       onSubmit(job);
       setUrl('');
     } catch (err) {
-      logDebug('ui', 'download submit failed', {
-        error: err instanceof Error ? err.message : String(err),
-        debug: formatDebugEntries(),
-      });
       if (err instanceof Error) {
         const message = err.message;
         if (message.includes('cookies.txt')) {

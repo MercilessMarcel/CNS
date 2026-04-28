@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X, Save, AlertCircle, Zap, Bug, Copy, Trash2 } from 'lucide-react';
+import { X, Save, AlertCircle, Zap } from 'lucide-react';
 import { fa } from '../lib/i18n';
 import { github } from '../lib/github';
 import { cn } from '../lib/utils';
-import { clearDebugEntries, formatDebugEntries, logDebug } from '../lib/debug';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -15,10 +14,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [cookies, setCookies] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [isAutoSetup, setIsAutoSetup] = useState(false);
   const [setupStep, setSetupStep] = useState<string>('');
-  const [debugText, setDebugText] = useState('');
   const hasSavedConfig = !!github.getConfig();
 
   useEffect(() => {
@@ -28,8 +25,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         setToken(config.token);
       }
       setError(null);
-      setNotice(null);
-      setDebugText(formatDebugEntries());
     }
   }, [isOpen]);
 
@@ -43,43 +38,31 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     const config = github.getConfig();
     if (config) {
       github.setConfig({ token, owner: config.owner, repo: config.repo });
-      setNotice('توکن جدید ذخیره شد');
-    } else {
-      setError('ابتدا راه‌اندازی خودکار را اجرا کنید تا مخزن ساخته شود');
     }
     setIsSaving(false);
+    onClose();
   };
 
   const handleClear = () => {
     github.clearConfig();
     setToken('');
-    setNotice('تنظیمات پاک شد');
   };
 
   const handleSaveCookies = async () => {
     if (!cookies.trim()) return;
 
     localStorage.setItem('cns_cookies', cookies.trim());
-    setNotice(null);
 
     const config = github.getConfig();
     if (config) {
       try {
         await github.uploadCookies(cookies.trim());
-        setNotice('کوکی‌ها ذخیره و در مخزن آپلود شدند');
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'خطا در آپلود کوکی‌ها';
-        logDebug('ui', 'save cookies failed', { message });
-        setError(message);
-        setDebugText(formatDebugEntries());
-        return;
+      } catch {
+        // Silent fail - will retry on next download
       }
-    } else {
-      setNotice('کوکی‌ها فقط به‌صورت محلی ذخیره شدند. پس از ساخت مخزن دوباره آپلود کنید.');
     }
 
     setCookies('');
-    setDebugText(formatDebugEntries());
   };
 
   const handleAutoSetup = async () => {
@@ -95,31 +78,15 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     try {
       await github.autoSetup(token, 'cns-downloads');
       setSetupStep(fa.settings.addingWorkflow);
-      setNotice('مخزن و workflow ساخته شدند');
-      setDebugText(formatDebugEntries());
       setTimeout(() => {
         onClose();
       }, 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'خطا در راه‌اندازی خودکار');
-      setDebugText(formatDebugEntries());
     } finally {
       setIsAutoSetup(false);
       setSetupStep('');
     }
-  };
-
-  const handleCopyDebug = async () => {
-    const text = formatDebugEntries();
-    setDebugText(text);
-    await navigator.clipboard.writeText(text);
-    setNotice('لاگ دیباگ کپی شد');
-  };
-
-  const handleClearDebug = () => {
-    clearDebugEntries();
-    setDebugText('');
-    setNotice('لاگ دیباگ پاک شد');
   };
 
   if (!isOpen) return null;
@@ -212,12 +179,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </div>
             )}
 
-            {notice && !error && (
-              <div className="summary-strip success flex items-center gap-2 text-xs text-cns-highlight">
-                <span dir="rtl">{notice}</span>
-              </div>
-            )}
-
             <div className="grid gap-2 sm:grid-cols-2">
               <button
                 onClick={handleSave}
@@ -277,36 +238,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               >
                 {fa.settings.extensionLink}
               </a>
-            </div>
-
-            <div className="hud-block">
-              <div className="flex items-center gap-2 text-xs text-cns-primary">
-                <Bug size={14} />
-                <span dir="rtl">دیباگ ارتباط گیت‌هاب</span>
-              </div>
-              <div className="helper-copy mt-2" dir="rtl">
-                اگر ساخت مخزن، آپلود کوکی یا شروع دانلود شکست خورد، این لاگ را کپی کنید.
-              </div>
-
-              <textarea
-                dir="ltr"
-                value={debugText}
-                readOnly
-                className="terminal-textarea mt-3 text-left"
-                placeholder="No debug logs yet."
-                spellCheck={false}
-              />
-
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button onClick={handleCopyDebug} className="system-btn w-full justify-center">
-                  <Copy size={12} />
-                  <span dir="rtl">کپی لاگ</span>
-                </button>
-                <button onClick={handleClearDebug} className="system-btn w-full justify-center border-cns-warning text-cns-warning hover:bg-cns-warning/10">
-                  <Trash2 size={12} />
-                  <span dir="rtl">پاک کردن لاگ</span>
-                </button>
-              </div>
             </div>
           </section>
         </div>
