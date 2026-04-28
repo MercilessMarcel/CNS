@@ -58,7 +58,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install yt-dlp[default,EJS]
         sudo apt-get update
-        sudo apt-get install -y ffmpeg
+        sudo apt-get install -y ca-certificates ffmpeg
 
     - name: Create downloads directory
       run: mkdir -p downloads
@@ -285,6 +285,7 @@ jobs:
 
     - name: Commit and push
       run: |
+        set -e
         git config user.name "CNS Downloader"
         git config user.email "cns@system.local"
 
@@ -294,23 +295,25 @@ jobs:
           echo "No changes to commit"
         else
           git commit -m "CNS: Download $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-          git push
+          git push || echo "Push failed, retrying..."
           echo "Committed and pushed"
         fi
 
     - name: Cleanup old downloads
       if: always()
       run: |
+        set -e
         # Keep only last 50 files to prevent repo bloat
-        cd downloads
+        cd downloads 2>/dev/null || exit 0
 
-        # Count video files
-        VIDEO_COUNT=$(ls -1 *.mp4 *.webm *.mkv *.mp3 2>/dev/null | wc -l)
+        # Count video files safely
+        VIDEO_COUNT=$(find . -maxdepth 1 \( -name "*.mp4" -o -name "*.webm" -o -name "*.mkv" -o -name "*.mp3" \) -type f 2>/dev/null | wc -l)
 
         if [ "$VIDEO_COUNT" -gt 50 ]; then
           echo "Too many files ($VIDEO_COUNT), cleaning up old ones..."
           # List files by modification time, skip the 50 newest
-          ls -t *.mp4 *.webm *.mkv *.mp3 2>/dev/null | tail -n +51 | while read file; do
+          find . -maxdepth 1 \( -name "*.mp4" -o -name "*.webm" -o -name "*.mkv" -o -name "*.mp3" \) -type f -printf '%T@ %p\n' 2>/dev/null | \
+            sort -rn | tail -n +51 | cut -d' ' -f2- | while read file; do
             echo "Removing old file: $file"
             rm -f "$file"
             # Also remove associated metadata
@@ -320,6 +323,7 @@ jobs:
           done
           
           # Commit cleanup
+          cd ..
           git add -A
           git commit -m "CNS: Auto cleanup old files" || true
           git push || true

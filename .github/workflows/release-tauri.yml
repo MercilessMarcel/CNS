@@ -21,7 +21,7 @@ jobs:
           container: ""
           args: --target x86_64-apple-darwin
         - platform: ubuntu-22.04
-          container: ubuntu:20.04
+          container: ubuntu:22.04
           args: --bundles appimage,deb
         - platform: windows-latest
           container: ""
@@ -41,13 +41,26 @@ jobs:
         TZ: UTC
       run: |
         apt-get update
-        apt-get install -y curl file build-essential pkg-config
+        apt-get install -y \
+          ca-certificates \
+          curl \
+          file \
+          git \
+          build-essential \
+          pkg-config \
+          python3
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: 20
         cache: npm
+
+    - name: Cache Rust
+      uses: swatinem/rust-cache@v2
+      if: matrix.platform != 'windows-latest'
+      with:
+        workspaces: src-tauri
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
