@@ -21,8 +21,8 @@ jobs:
           container: ""
           args: --target x86_64-apple-darwin
         - platform: ubuntu-22.04
-          container: ubuntu:22.04
-          args: --bundles appimage,deb
+          container: ""
+          args: --bundles deb
         - platform: windows-latest
           container: ""
           args: ""
