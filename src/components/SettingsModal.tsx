@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { X, Save, AlertCircle, Zap } from 'lucide-react';
+import { X, Save, AlertCircle, Zap, Activity } from 'lucide-react';
 import { fa } from '../lib/i18n';
 import { github } from '../lib/github';
 import { cn } from '../lib/utils';
+import { DiagnosticsPanel } from './DiagnosticsPanel';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -17,8 +18,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [isAutoSetup, setIsAutoSetup] = useState(false);
   const [setupStep, setSetupStep] = useState<string>('');
-  const savedConfig = github.getConfig();
-  const hasSavedConfig = !!savedConfig;
+  const [activeTab, setActiveTab] = useState<'settings' | 'diagnostics'>('settings');
+  const hasSavedConfig = !!github.getConfig();
 
   useEffect(() => {
     if (isOpen) {
@@ -119,10 +120,36 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
       <div className="modal-shell modal-popup relative w-full max-w-3xl cns-panel corner-accent bg-cns-bg" dir="ltr">
         <div className="panel-head border-b border-cns-deep/70 px-5 py-4">
-          <div>
+          <div className="flex items-center gap-4">
             <div className="section-label">
               <span className="text-cns-primary">{'>'}</span>
               {fa.settings.label}
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setActiveTab('settings')}
+                className={cn(
+                  "px-3 py-1 text-xs rounded transition-colors",
+                  activeTab === 'settings'
+                    ? "bg-cns-primary/20 text-cns-primary"
+                    : "text-cns-primary/50 hover:text-cns-primary"
+                )}
+                dir="rtl"
+              >
+                تنظیمات
+              </button>
+              <button
+                onClick={() => setActiveTab('diagnostics')}
+                className={cn(
+                  "px-3 py-1 text-xs rounded transition-colors flex items-center gap-1",
+                  activeTab === 'diagnostics'
+                    ? "bg-cns-primary/20 text-cns-primary"
+                    : "text-cns-primary/50 hover:text-cns-primary"
+                )}
+              >
+                <Activity size={12} />
+                Diagnostics
+              </button>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -139,6 +166,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         </div>
 
         <div className="grid gap-4 p-4 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] md:p-5">
+          {activeTab === 'diagnostics' ? (
+            <section className="col-span-full">
+              <DiagnosticsPanel isOpen={isOpen} />
+            </section>
+          ) : (
+          <>
           <section className="space-y-4">
             <div className={cn("summary-strip", hasSavedConfig ? "success" : "warning")}>
               <div className="space-y-1">
@@ -282,6 +315,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </a>
             </div>
           </section>
+          </>
+          )}
         </div>
       </div>
     </div>

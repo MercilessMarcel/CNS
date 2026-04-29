@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Terminal, Radio, Archive, Settings } from 'lucide-react';
 import { fa } from './lib/i18n';
 import { github, DownloadJob } from './lib/github';
+import { logger } from './lib/logger';
 import { cn } from './lib/utils';
 import { InputNode } from './components/InputNode';
 import { SignalFeed } from './components/SignalFeed';
@@ -29,9 +30,21 @@ function App() {
   const [hasConfig, setHasConfig] = useState(false);
   const [activeTab, setActiveTab] = useState<'input' | 'feed' | 'archive'>('input');
   const [archiveRefreshKey, setArchiveRefreshKey] = useState(0);
+  const [initError, setInitError] = useState<string | null>(null);
 
   useEffect(() => {
-    setHasConfig(!!github.getConfig());
+    logger.info('App startup: config initialization start');
+    try {
+      const config = github.getConfig();
+      const configAvailable = !!config;
+      setHasConfig(configAvailable);
+      logger.info('App startup: config initialization complete', { hasConfig: configAvailable });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      logger.error('App startup: config check failed', { error: msg });
+      setInitError(msg);
+      setHasConfig(false);
+    }
   }, []);
 
   const handleJobSubmit = useCallback((job: DownloadJob) => {
@@ -55,7 +68,7 @@ function App() {
   const heroMetrics = [
     { label: 'LIVE', value: String(activeJobs) },
     { label: 'DONE', value: String(completedJobs) },
-    { label: 'SYNC', value: hasConfig ? 'ONLINE' : 'OFFLINE' },
+    { label: 'SYNC', value: initError ? 'ERROR' : hasConfig ? 'ONLINE' : 'OFFLINE' },
   ];
 
   return (
@@ -80,6 +93,14 @@ function App() {
       <div className="shell-glow" />
 
       <div className="relative mx-auto max-w-7xl">
+        {initError && (
+          <div className="mb-4 p-3 border border-cns-warning/50 bg-cns-warning/10 rounded-lg">
+            <div className="text-cns-warning text-sm" dir="rtl">
+              خطای راه‌اندازی: {initError}
+            </div>
+          </div>
+        )}
+
         <header className="flex items-center justify-between mb-6 p-4 border border-cns-primary/30 rounded-lg bg-cns-bg">
           <h1 className="text-lg font-mono text-cns-highlight" dir="rtl">{fa.app.title}</h1>
           <div className="flex items-center gap-2">
