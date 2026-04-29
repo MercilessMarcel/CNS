@@ -5,6 +5,7 @@ use std::env;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
+use tauri::Manager;
 
 #[tauri::command]
 fn export_logs_to_file(window: tauri::Window, content: String) -> Result<String, String> {
