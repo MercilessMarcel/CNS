@@ -1,8 +1,7 @@
 declare global {
   interface Window {
-    __TAURI__?: {
-      invoke: (command: string, payload?: any) => Promise<any>;
-    };
+    __TAURI__?: any;
+    __TAURI_INVOKE__?: (command: string, payload?: any) => Promise<any>;
   }
 }
 
@@ -75,8 +74,14 @@ class Logger {
 
   async exportToFile(): Promise<string> {
     const content = this.export();
-    const invoke = window.__TAURI__?.invoke;
-    
+    const invoke = typeof window.__TAURI__?.invoke === 'function'
+      ? window.__TAURI__!.invoke
+      : typeof window.__TAURI_INVOKE__ === 'function'
+      ? window.__TAURI_INVOKE__
+      : typeof window.__TAURI__?.tauri?.invoke === 'function'
+      ? window.__TAURI__.tauri.invoke
+      : undefined;
+
     if (typeof invoke !== 'function') {
       const error = new Error('Tauri invoke unavailable');
       this.error('Failed to export logs to file', error);

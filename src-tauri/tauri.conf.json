@@ -4,7 +4,8 @@
     "beforeBuildCommand": "npm run build",
     "beforeDevCommand": "npm run dev",
     "devPath": "http://localhost:3000",
-    "distDir": "../dist"
+    "distDir": "../dist",
+    "withGlobalTauri": true
   },
   "package": {
     "productName": "CNS",
@@ -12,7 +13,10 @@
   },
   "tauri": {
     "allowlist": {
-      "all": false
+      "all": false,
+      "tauri": {
+        "all": true
+      }
     },
     "bundle": {
       "active": true,
