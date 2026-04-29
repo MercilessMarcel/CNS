@@ -1,240 +1,226 @@
-<img width="1815" height="570" alt="CNS_logo_close" src="https://github.com/user-attachments/assets/1f29a8e0-98a1-4794-b66c-4a09db94c055" />
+<div align="center">
+
+![CNS Logo](https://private-user-images.githubusercontent.com/279085014/583855249-1f29a8e0-98a1-4794-b66c-4a09db94c055.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3Nzc0OTAxOTIsIm5iZiI6MTc3NzQ4OTg5MiwicGF0aCI6Ii8yNzkwODUwMTQvNTgzODU1MjQ5LTFmMjlhOGUwLTk4YTEtNDc5NC1iNjZjLTRhMDlkYjk0YzA1NS5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjYwNDI5JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI2MDQyOVQxOTExMzJaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1jNTVkYTM2ZTliMmU4YzdkYTM0NDZlODkyYTM2NTkyMjI5ZDY2NjhmMDBmMGU3NjUwYWU5YjM0MjVjYTc0ZTBmJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCZyZXNwb25zZS1jb250ZW50LXR5cGU9aW1hZ2UlMkZwbmcifQ.CmcZ0-gxk384h6WefRNwu-n_6fRwi8OLvC_WSZUgnyg)
+
+[![Downloads](https://img.shields.io/github/downloads/MercilessMarcel/CNS/total?style=flat-square&logo=github)](https://github.com/MercilessMarcel/CNS/releases/)
+[![Last Version](https://img.shields.io/github/release/MercilessMarcel/CNS/all.svg?style=flat-square)](https://github.com/MercilessMarcel/CNS/releases/)
+[![Last Release Date](https://img.shields.io/github/release-date/MercilessMarcel/CNS.svg?style=flat-square)](https://github.com/MercilessMarcel/CNS/releases/)
+[![Stars](https://img.shields.io/github/stars/MercilessMarcel/CNS?style=flat-square)](https://github.com/MercilessMarcel/CNS/stargazers)
+
+</div>
+
+## سی‌ان‌اس چیست؟
+
+سی‌ان‌اس یک ابزار قدرتمند برای دانلود ویدیوهای یوتیوب با استفاده از زیرساخت گیت‌هاب است. سی‌ان‌اس به شما این امکان را می‌دهد که بدون نیاز به وی‌پی‌ان و با سرعت بالا، ویدیوهای مورد نظر خود را دانلود و مدیریت کنید. این برنامه از قدرت سرورهای گیت‌هاب برای دانلود بهره می‌برد و حتی با اینترنت کند، تجربه دانلود سریع و پایداری را ارائه می‌دهد.
+
+## 🚀 امکانات اصلی
+
+⭐ رابط کاربری ساده و کاربرپسند با طراحی مدرن
+
+✈️ پشتیبانی از چند پلتفرم: ویندوز، لینوکس و مک
+
+🔍 دانلود با سرعت بالا بدون نیاز به VPN
+
+🟡 پشتیبانی از انواع کیفیت‌ها:
+Best Quality, 1080p, 720p, 480p و فقط صدا
+
+🟡 پشتیبانی از فرمت‌های مختلف:
+MP4, WebM, MP3
+
+🔄 مدیریت خودکار فایل‌های بزرگ با قابلیت تقسیم‌بندی
+
+🔎 داشبورد مدیریت دانلود با آرشیو کامل
+
+🌙 رایگان، منبع‌باز و بدون تبلیغات
+
+⚙ راه‌اندازی ساده و خودکار	
+
+📱 نسخه دسکتاپ آماده برای استفاده
+
+⭐ کاملا فارسی و بهینه برای کاربران ایرانی
+
+## 📥 دانلود و نصب
+
+### دانلود مستقیم نسخه دسکتاپ (v1.1.0)
+
 <div dir="rtl" align="right">
+   <table>
+    <thead align="right">
+        <tr>
+            <th>سیستم عامل</th>
+            <th>دانلود</th>
+        </tr>
+    </thead>
+    <tbody align="right">
+        <tr>
+            <td>ویندوز</td>
+            <td>
+                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.0/CNS_1.1.0_x64-setup.exe"><img src="https://img.shields.io/badge/Setup-x64-0078d7.svg?logo=windows"></a><br>
+                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.0/CNS_1.1.0_x64_en-US.msi"><img src="https://img.shields.io/badge/MSI-x64-2d7d9a.svg?logo=windows"></a>
+            </td>
+        </tr>
+        <tr>
+            <td>لینوکس</td>
+            <td>
+                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.0/cns_1.1.0_amd64.deb"><img src="https://img.shields.io/badge/DEB-x64-FF9966.svg?logo=debian"></a>
+            </td>
+        </tr>
+        <tr>
+            <td>مک</td>
+            <td>
+                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.0/CNS_1.1.0_aarch64.dmg"><img src="https://img.shields.io/badge/DMG-Apple_Silicon-007AFF.svg?logo=apple"></a><br>
+                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.0/CNS_1.1.0_x64.dmg"><img src="https://img.shields.io/badge/DMG-Intel-ea005e.svg?logo=apple"></a><br>
+                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.0/CNS_aarch64.app.tar.gz"><img src="https://img.shields.io/badge/APP-ARM64-34C759.svg?logo=apple"></a><br>
+                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.0/CNS_x64.app.tar.gz"><img src="https://img.shields.io/badge/APP-x64-FF9500.svg?logo=apple"></a>
+            </td>
+        </tr>
+    </tbody>
+</table>
+</div>
 
-# 👾 CNS — دانلود ویدیو با گیت‌هاب
+### ساخت از روی سورس
 
-**یک راه ساده برای دانلود ویدیو از یوتیوب بدون نیاز به VPN با سرعت بالا!**
-
-CNS یک برنامه کاربردی است که به شما اجازه می‌دهد ویدیوها را از یوتیوب دانلود کنید و آن‌ها را مستقیماً در حساب گیت‌هاب خود ذخیره کنید. این برنامه از قدرت سرورهای گیت‌هاب برای دانلود استفاده می‌کند — یعنی حتی اگر اینترنت شما کند باشد، سرورهای گیت‌هاب با سرعت بالا ویدیو را دانلود می‌کنند!
-
----
-
-## 🖥️ نسخه دسکتاپ آماده اجرا
-
-اگر کاربر عادی هستید و نمی‌خواهید `Node.js` یا ابزار توسعه نصب کنید، از **بخش Releases** نسخه دسکتاپ را دانلود کنید:
-
-- **Windows:** فایل نصب `*.exe`
-- **Linux:** فایل `*.AppImage` یا بسته `*.deb`
-- **macOS:** فایل `*.dmg`
-
-بعد از اولین راه‌اندازی، برنامه مثل یک اپ عادی دسکتاپ اجرا می‌شود و دیگر لازم نیست `npm run dev` یا ترمینال باز کنید.
-
-> نکته مهم: با Tauri نمی‌شود **یک فایل واحد مشترک** برای همه سیستم‌عامل‌ها ساخت. برای هر سیستم‌عامل باید خروجی همان پلتفرم ساخته شود. به همین دلیل در این مخزن workflow جداگانه برای Windows / macOS / Linux اضافه شده است.
-
-### ساخت خروجی دسکتاپ از روی سورس
-
-اگر می‌خواهید خودتان خروجی بگیرید:
+اگر می‌خواهید خودتان برنامه را بسازید:
 
 ```bash
+# نصب وابستگی‌ها
 npm install
+
+# ساخت نسخه دسکتاپ
 npm run desktop:build
 ```
 
-پیش‌نیاز این مرحله: `Rust stable` باید روی سیستم شما نصب باشد. اگر نصب نیست:
-
+**پیش‌نیاز:** نیاز به نصب `Rust stable` دارید:
 ```bash
 rustup default stable
 ```
 
-خروجی‌ها در پوشه `src-tauri/target/release/bundle/` ساخته می‌شوند.
+خروجی‌ها در پوشه `src-tauri/target/release/bundle/` قرار می‌گیرند.
 
-### خروجی قابل حمل (Portable)
+### ساخت نسخه قابل حمل (Portable)
 
-برای Windows می‌توانید فایل اجرایی خام هم بسازید:
-
+برای ویندوز:
 ```bash
 npm run desktop:build:portable
 ```
 
-فایل نهایی در `src-tauri/target/release/` قرار می‌گیرد. این روش بیشتر برای تست یا توزیع دستی مناسب است؛ برای کاربران عادی، **installer رسمی** گزینه مطمئن‌تری است.
+فایل اجرایی در `src-tauri/target/release/` ساخته می‌شود.
 
-### انتشار خودکار برای همه سیستم‌عامل‌ها
+## ⚙️ راه‌اندازی و آموزش
 
-فایل `.github/workflows/release-tauri.yml` اضافه شده است. با push کردن tag هایی مثل `v1.0.0`، گیت‌هاب به‌صورت خودکار خروجی‌های Windows / macOS / Linux را می‌سازد و در Draft Release قرار می‌دهد.
+### مرحله ۱: ساخت توکن GitHub
 
----
+برای استفاده از CNS، نیاز به یک توکن دسترسی شخصی از GitHub دارید:
 
-## 🚀 شروع سریع
+1. به [github.com](https://github.com) بروید و وارد شوید
+2. روی عکس پروفایل کلیک کنید و **Settings** را انتخاب کنید
+3. از منوی چپ، **Developer settings** را باز کنید
+4. **Personal access tokens** > **Tokens (classic)** را انتخاب کنید
+5. روی **Generate new token (classic)** کلیک کنید
+6. در قسمت **Note** نامی مانند "CNS App" وارد کنید
+7. **⚠️ مهم:** حتماً دسترسی‌های `repo` و `workflow` را فعال کنید
+8. روی **Generate token** کلیک و توکن را کپی کنید
 
-### مرحله ۱: نصب برنامه
+> 💡 **نکته امنیتی:** توکن را در جای امن نگه دارید و با هیچ‌کس به اشتراک نگذارید.
 
-۱. این برنامه را روی کامپیوتر خود دانلود و استخراج کنید
-۲. پوشه برنامه را در ترمینال/کامندلاین باز کنید
-۳. دستور زیر را اجرا کنید:
+### مرحله ۲: دریافت کوکی‌های YouTube
 
-```bash
-npm install --registry https://mirror2.chabokan.net/npm/
-```
+برای دانلود ویدیو، به کوکی‌های حساب یوتیوب نیاز دارید:
 
-۴. حالا برنامه را اجرا کنید:
+1. افزونه [Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc) را نصب کنید
+2. به [youtube.com](https://youtube.com) بروید و وارد شوید
+3. روی آیکون افزونه کلیک و **Export** را انتخاب کنید
+4. فایل `cookies.txt` را دانلود کنید
+5. محتویات فایل را در تنظیمات CNS وارد کنید
 
-```bash
-npm run dev
-```
+### مرحله ۳: راه‌اندازی خودکار
 
-۵. آدرسی که در ترمینال نشان داده می‌شود (مثل `http://localhost:5173`) را در مرورگر باز کنید
+1. برنامه CNS را باز کنید
+2. توکن GitHub را وارد کنید
+3. روی **راه‌اندازی خودکار** کلیک کنید
+4. برنامه به‌صورت خودکار مخزن `cns-downloads` را می‌سازد
 
----
+## 📖 نحوه استفاده
 
-### مرحله ۲: ساخت توکن گیت‌هاب (خیلی مهم!)
+### دانلود ویدیو
 
-برای اینکه CNS بتواند ویدیوها را برای شما دانلود کند، باید یک «کلید دسترسی» از گیت‌هاب بگیرید. این کار کاملاً امن است و فقط به شما اجازه می‌دهد برنامه به حساب شما متصل شود.
+1. آدرس ویدیوی یوتیوب را کپی کنید
+2. در کادر ورودی پیست کنید
+3. کیفیت دلخواه را انتخاب کنید (Best, 1080p, 720p, 480p, Audio)
+4. فرمت خروجی را انتخاب کنید (MP4, WebM, MP3)
+5. روی دکمه **دانلود** کلیک کنید
 
-#### 🔑 آموزش گام‌به‌گام ساخت توکن:
+### مدیریت دانلودها
 
-**۱. ورود به تنظیمات گیت‌هاب**
-- به [github.com](https://github.com) بروید و وارد حساب خود شوید
-- روی عکس پروفایل خود (گوشه بالا-راست) کلیک کنید
-- از منوی باز شده، **Settings** را انتخاب کنید
+در بخش **آرشیو دانلود**:
+- لیست تمام فایل‌های دانلودشده را مشاهده کنید
+- فایل‌ها را روی کامپیوتر خود دانلود کنید
+- فایل‌های غیرضروری را حذف کنید
 
-**۲. رفتن به بخش توکن‌ها**
-- از منوی سمت چپ، پایین‌ترین گزینه یعنی **Developer settings** را کلیک کنید
-- حالا روی **Personal access tokens** کلیک کنید
-- سپس **Tokens (classic)** را انتخاب کنید
-- روی دکمه سبز **Generate new token (classic)** کلیک کنید
+### ترکیب فایل‌های تقسیم‌شده
 
-**۳. تنظیم توکن**
-- در قسمت **Note** یک نام بنویسید (مثلاً: `CNS App`)
-- تاریخ انقضا را روی **No expiration** بگذارید (یا هر تاریخی که می‌خواهید)
-- ⚠️ **مهم:** در بخش **Select scopes**، حتماً تیک **repo** و **workflow** را بزنید (این‌ها به برنامه اجازه می‌دهد مخازن شما را مدیریت کند)
+برای فایل‌های بزرگتر از ۹۵MB که به بخش‌های ZIP تقسیم می‌شوند:
 
-**۴. ذخیره توکن**
-- روی **Generate token** کلیک کنید
-- ⚠️ **خیلی مهم:** توکن نشان داده شده را کپی و در جای امن نگه دارید — فقط یک بار نشان داده می‌شود!
-
-> 💡 **توکن چیست؟** توکن مثل یک رمز عبور خاص است که فقط به این برنامه اجازه می‌دهد کارهای خاصی در حساب شما انجام دهد. شما هر وقت بخواهید می‌توانید آن را در گیت‌هاب حذف کنید.
-
----
-
-### مرحله ۳: دریافت کوکی‌های یوتیوب (بسیار مهم!)
-
-برای دانلود ویدیوهای یوتیوب، به کوکی‌های حساب یوتیوب نیاز دارید. این کار به برنامه اجازه می‌دهد با هویت شما دانلود کند.
-
-**۱. نصب افزونه**
-- به [این لینک](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc) بروید
-- افزونه **Get cookies.txt LOCALLY** را نصب کنید
-
-**۲. دریافت کوکی**
-- به [youtube.com](https://youtube.com) بروید و وارد حساب خود شوید
-- روی آیکون افزونه در نوار ابزار کروم کلیک کنید
-- روی دکمه **Export** یا **Download** کلیک کنید
-- فایل `cookies.txt` دانلود می‌شود
-
-**۳. کپی کردن کوکی**
-- فایل `cookies.txt` را با یک ویرایشگر متن باز کنید
-- تمام محتویات را کپی کنید
-- در برنامه CNS، به بخش تنظیمات بروید
-- محتویات را در فیلد کوکی‌ها پیست کنید
-- روی دکمه ذخیره کلیک کنید
-
-
-> ⚠️ **نکته مهم:** کوکی‌ها اطلاعات حساس هستند. آن‌ها را با هیچ‌کس به اشتراک نگذارید و در جای امن نگه دارید.
-
----
-
-### مرحله ۴: راه‌اندازی خودکار
-
-وقتی برای اولین بار برنامه را باز کنید، باید مخزن گیت‌هاب را بسازید:
-
-۱. توکن گیت‌هاب را در فیلد مربوطه وارد کنید
-۲. روی دکمه **راه‌اندازی خودکار** کلیک کنید
-۳. برنامه به‌صورت خودکار یک مخزن خصوصی به نام `cns-downloads` برای شما می‌سازد
-۴. فایل workflow لازم را نیز به‌صورت خودکار اضافه می‌کند
-
----
-
-## 📥 چطور ویدیو دانلود کنم؟
-
-### ۱. وارد داشبورد شوید
-
-پس از ورود، به صفحه اصلی (داشبورد) می‌روید. اینجا سه بخش وجود دارد:
-
-#### 🎛️ تنظیمات مخزن
-- می‌توانید توکن را به‌روزرسانی کنید
-- می‌توانید کوکی‌های یوتیوب را آپلود کنید
-
-#### ⬇️ شروع دانلود
-- آدرس ویدیوی یوتیوب را در کادر بزرگ وارد کنید
-- کیفیت را انتخاب کنید:
-  - **best**: بهترین کیفیت موجود
-  - **1080p**: کیفیت ۱۰۸۰p
-  - **720p**: کیفیت ۷۲۰p
-  - **480p**: کیفیت ۴۸۰p
-  - **audio**: فقط صدا
-- فرمت خروجی را انتخاب کنید:
-  - **mp4**: فرمت MP4
-  - **webm**: فرمت WebM
-  - **mp3**: فرمت MP3 (فقط صدا)
-- روی **دانلود** کلیک کنید
-
-#### 📁 آرشیو دانلود
-- لیست همه ویدیوهای دانلودشده
-- روی **دانلود** کلیک کنید تا فایل روی کامپیوتر شما ذخیره شود
-- می‌توانید ویدیوها را حذف کنید
-
----
-
-## 🔄 ترکیب بخش‌های تقسیم‌شده
-
-وقتی فایلی بزرگ‌تر از ۹۵MB دانلود شود، برنامه آن را به‌صورت خودکار به بخش‌های ZIP تقسیم می‌کند. برای ترکیب این بخش‌ها:
-
-### ۱. دانلود همه بخش‌ها
-- در آرشیو، روی دکمه **X بخش - دانلود** کلیک کنید
-- همه بخش‌ها را دانلود کنید (فایل‌ها به صورت `filename.zip`, `filename.z01`, `filename.z02`, ... نام‌گذاری می‌شوند)
-
-### ۲. ترکیب بخش‌ها با ZIP
-
-- برای ترکیب فایل بعد از دانلود بخش‌ها کافی است که فایلی که با پسوند `.zip` (بخش آخر) را باز کنید و ویدیو داخلش را استخراج کنید. برای این کار به بقیه بخش‌ها نیاز است!
----
+1. همه بخش‌ها را دانلود کنید
+2. فایل با پسوند `.zip` را باز کنید
+3. ویدیو به‌صورت خودکار از بخش‌ها استخراج می‌شود
 
 ## 🛠️ عیب‌یابی
 
 ### دانلود شروع نمی‌شود
-- مطمئن شوید توکن گیت‌هاب معتبر است
-- مطمئن شوید مخزن وجود دارد
-- کوکی‌های یوتیوب را بررسی کنید
+
+توکن GitHub را بررسی کنید
+مطمئن شوید مخزن ساخته شده است
+کوکی‌های YouTube را به‌روز کنید
 
 ### خطای "cookies.txt not found"
-- کوکی‌ها را در تنظیمات آپلود کنید
-- مطمئن شوید فرمت کوکی‌ها صحیح است
+
+کوکی‌ها را در تنظیمات بارگذاری کنید
+فرمت فایل کوکی را بررسی کنید
 
 ### خطای "Rate limited"
-- گیت‌هاب محدودیت استفاده دارد
-- چند دقیقه صبر کنید و دوباره تلاش کنید
+
+چند دقیقه صبر کنید
+GitHub محدودیت استفاده در ساعت دارد
 
 ---
-</div>
+## ⚠️ هشدار امنیتی مهم
 
 > [!CAUTION]
-> توکن گیت‌هاب و کوکی‌های یوتیوب مثل رمز عبور حساب شماست. اگر کسی آن‌ها را داشته باشد، می‌تواند:
-> - به تمام مخازن خصوصی شما دسترسی پیدا کند
-> - کدهای شما را تغییر دهد یا حذف کند
-> - اطلاعات حساس شما را بدزد
-> - توکن و کوکی را در هیچ چت، ایمیل، یا فرم آنلاین وارد نکنید
-> - توکن و کوکی را در اسکرین‌شات به اشتراک نگذارید
-> - اگر فکر می‌کنید توکن یا کوکی لو رفته، فوراً در گیت‌هاب آن را حذف کنید
-> - توکن و کوکی فقط در مرورگر خودتان و برای این برنامه استفاده شود
+> **توکن GitHub و کوکی‌های YouTube بسیار حساس هستند.**
+> 
+> - مثل رمز عبور اصلی حسابتون مراقبشون باشید
+> - هرگز آن‌ها را در چت، اسکرین‌شات، ایمیل یا هیچ پلتفرمی به اشتراک نگذارید
+> - اگر مشکوک به لو رفتن شدید، **فوراً** توکن را در GitHub revoke کنید
+> - فقط در دستگاه و مرورگر شخصی خودتان استفاده کنید
+---
+
+## 🙏 سپاسگزاری‌ها
+
+این پروژه با الهام از ابزارهای زیر ساخته شده است:
+
+- [github-sandbox](https://github.com/maanimis/github-sandbox) - ایده اصلی استفاده از GitHub Actions
+- [sandbox](https://github.com/nscl5/sandbox/) - روش تقسیم‌بندی فایل‌ها
+
+تشکر ویژه از تمام توسعه‌دهندگان.
+
+## 🎯 حمایت از پروژه
+
+ساده‌ترین راه حمایت از ما کلیک کردن روی ستاره (⭐) بالای همین صفحه است.
+
+[![Stargazers over time](https://starchart.cc/MercilessMarcel/CNS.svg?background=%23181e19&axis=%236fb08c&line=%23495948)](https://starchart.cc/MercilessMarcel/CNS)
+
+## 📞 ارتباط با ما
+
+اگر سوال، پیشنهاد یا گزارش باگ دارید:
+
+- [GitHub Issues](https://github.com/MercilessMarcel/CNS/issues) - گزارش مشکلات
+- [GitHub Discussions](https://github.com/MercilessMarcel/CNS/discussions) - بحث و تبادل نظر
+
+## 📄 مجوز
+
+این پروژه تحت مجوز [MIT](LICENSE) منتشر شده است.
 
 ---
 
-<div dir="rtl" align="right">
-
-
-## 🙏 قدردانی
-
-این برنامه بر اساس ایده و ساختار این مخزن‌ها ساخته شده است:
-
-- **مخزن اصلی**: [github-sandbox](https://github.com/maanimis/github-sandbox)
-- **ایده اصلی**: استفاده از GitHub Actions برای دانلود فایل‌ها
-
-- **مخزن اصلی**: [sandbox](https://github.com/nscl5/sandbox/)
-- **ایده اصلی**: تقسیم کردن ویدیو ها با استفاده از zip
----
-
-<div align="center">
-
-<img width="1920" height="1080" alt="Cns1" src="https://github.com/user-attachments/assets/c8eb4d3d-7d47-4cb3-adb2-e2663d9ff429" />
-
-</div>
-
-</div>
+<img width="1920" height="1080" alt="[SEEK THE TRUTH BEYOND THE WALLS]" src="https://github.com/user-attachments/assets/c8eb4d3d-7d47-4cb3-adb2-e2663d9ff429" />
