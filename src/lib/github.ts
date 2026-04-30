@@ -1,4 +1,63 @@
+import { logger } from './logger';
+
 const API_BASE = 'https://api.github.com';
+
+// Safe localStorage wrapper with fallback
+const storage = {
+  get(key: string): string | null {
+    try {
+      return localStorage.getItem(key);
+    } catch (err) {
+      logger.warn(`Storage get failed for ${key}`, { error: err });
+      return null;
+    }
+  },
+
+  set(key: string, value: string): boolean {
+    try {
+      localStorage.setItem(key, value);
+      return true;
+    } catch (err) {
+      logger.warn(`Storage set failed for ${key}`, { error: err });
+      return false;
+    }
+  },
+
+  remove(key: string): boolean {
+    try {
+      localStorage.removeItem(key);
+      return true;
+    } catch (err) {
+      logger.warn(`Storage remove failed for ${key}`, { error: err });
+      return false;
+    }
+  },
+};
+
+// Safe JSON parse with fallback
+function safeJSONParse<T>(str: string | null, fallback: T): T {
+  if (!str) return fallback;
+  try {
+    return JSON.parse(str) as T;
+  } catch (err) {
+    logger.warn('JSON parse failed, using fallback', { error: err });
+    return fallback;
+  }
+}
+
+// Validate GitHubConfig object
+function isValidConfig(obj: unknown): obj is GitHubConfig {
+  if (!obj || typeof obj !== 'object') return false;
+  const config = obj as Record<string, unknown>;
+  return (
+    typeof config.token === 'string' &&
+    typeof config.owner === 'string' &&
+    typeof config.repo === 'string' &&
+    config.token.length > 0 &&
+    config.owner.length > 0 &&
+    config.repo.length > 0
+  );
+}
 
 // Error types for better handling
 export class CNSError extends Error {
@@ -361,23 +420,38 @@ class GitHubClient {
   private config: GitHubConfig | null = null;
 
   setConfig(config: GitHubConfig) {
+    if (!isValidConfig(config)) {
+      logger.error('Invalid config object provided to setConfig', { config });
+      return;
+    }
     this.config = config;
-    localStorage.setItem('cns_github_config', JSON.stringify(config));
+    storage.set('cns_github_config', JSON.stringify(config));
+    logger.info('[GitHub] Config saved', { owner: config.owner, repo: config.repo });
   }
 
   getConfig(): GitHubConfig | null {
     if (this.config) return this.config;
-    const stored = localStorage.getItem('cns_github_config');
-    if (stored) {
-      this.config = JSON.parse(stored);
-      return this.config;
+
+    const stored = storage.get('cns_github_config');
+    if (!stored) return null;
+
+    const parsed = safeJSONParse<unknown>(stored, null);
+
+    if (!isValidConfig(parsed)) {
+      logger.error('[GitHub] Invalid or corrupted config found, clearing', { parsed });
+      storage.remove('cns_github_config');
+      return null;
     }
-    return null;
+
+    this.config = parsed;
+    logger.info('[GitHub] Config loaded', { owner: parsed.owner, repo: parsed.repo });
+    return this.config;
   }
 
   clearConfig() {
     this.config = null;
-    localStorage.removeItem('cns_github_config');
+    storage.remove('cns_github_config');
+    logger.info('[GitHub] Config cleared');
   }
 
   private async requestWithToken(token: string, path: string, options: RequestInit = {}, retries: number = 3): Promise<any> {
@@ -739,7 +813,12 @@ class GitHubClient {
 
   // Cookies management
   getCookies(): string | null {
-    return localStorage.getItem('cns_cookies');
+    return storage.get('cns_cookies');
+  }
+
+  clearCookies(): void {
+    storage.remove('cns_cookies');
+    logger.info('[GitHub] Cookies cleared');
   }
 
   async uploadCookies(cookiesContent: string): Promise<void> {

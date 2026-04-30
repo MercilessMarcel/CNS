@@ -1,12 +1,13 @@
 {
   "name": "cns",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "build": "tsc && vite build && npm run verify-dist",
+    "preview": "vite preview",
+    "verify-dist": "node ./scripts/verify-dist.js"
   },
   "dependencies": {
     "clsx": "^2.0.0",

@@ -74,6 +74,23 @@ export const fa = {
     invalidUrl: 'آدرس نامعتبر',
     noToken: 'توکن گیت‌هاب تنظیم نشده',
     network: 'خطای شبکه',
+    startupError: 'خطای راه‌اندازی',
+    corruptedConfig: 'پیکربندی خراب',
+    retry: 'تلاش مجدد',
+    clearConfig: 'پاک کردن تنظیمات',
+  },
+  diagnostics: {
+    label: 'ع diagnostics',
+    systemStatus: 'وضعیت سیستم',
+    appVersion: 'نسخه اپلیکیشن',
+    config: 'پیکربندی',
+    valid: 'معتبر',
+    missing: 'ناموجود',
+    corrupted: 'خراب',
+    logs: 'لاگ‌ها',
+    export: 'دانلود لاگ',
+    clearLogs: 'پاک کردن لاگ',
+    reset: 'پاک کردن تنظیمات',
   },
 } as const;
 
