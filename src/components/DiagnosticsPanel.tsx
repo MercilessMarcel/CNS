@@ -59,8 +59,16 @@ export function DiagnosticsPanel({ isOpen }: DiagnosticsPanelProps) {
     try {
       const path = await logger.exportToFile();
       setFileExportPath(path);
+      window.alert(`Log export succeeded.\nPath: ${path}`);
     } catch (err) {
-      setExportError(err instanceof Error ? err.message : String(err));
+      const reason = err instanceof Error ? err.message : String(err);
+      setExportError(reason);
+      if (reason.includes('Tauri invoke unavailable')) {
+        handleExport();
+        window.alert(`Log export fallback used.\nReason: ${reason}\nResult: Browser download started.`);
+      } else {
+        window.alert(`Log export failed.\nReason: ${reason}`);
+      }
     } finally {
       setIsExportingFile(false);
     }
