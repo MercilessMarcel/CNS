@@ -46,7 +46,7 @@ MP4, WebM, MP3
 
 ## 📥 دانلود و نصب
 
-### دانلود مستقیم نسخه دسکتاپ (v1.1.0)
+### دانلود مستقیم نسخه دسکتاپ (v1.1.1)
 
 <div dir="rtl" align="right">
    <table>
@@ -60,23 +60,23 @@ MP4, WebM, MP3
         <tr>
             <td>ویندوز</td>
             <td>
-                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.0/CNS_1.1.0_x64-setup.exe"><img src="https://img.shields.io/badge/Setup-x64-0078d7.svg?logo=windows"></a><br>
-                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.0/CNS_1.1.0_x64_en-US.msi"><img src="https://img.shields.io/badge/MSI-x64-2d7d9a.svg?logo=windows"></a>
+                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.1/CNS_1.1.1_x64-setup.exe"><img src="https://img.shields.io/badge/Setup-x64-0078d7.svg?logo=windows"></a><br>
+                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.1/CNS_1.1.1_x64_en-US.msi"><img src="https://img.shields.io/badge/MSI-x64-2d7d9a.svg?logo=windows"></a>
             </td>
         </tr>
         <tr>
             <td>لینوکس</td>
             <td>
-                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.0/cns_1.1.0_amd64.deb"><img src="https://img.shields.io/badge/DEB-x64-FF9966.svg?logo=debian"></a>
+                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.1/cns_1.1.1_amd64.deb"><img src="https://img.shields.io/badge/DEB-x64-FF9966.svg?logo=debian"></a>
             </td>
         </tr>
         <tr>
             <td>مک</td>
             <td>
-                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.0/CNS_1.1.0_aarch64.dmg"><img src="https://img.shields.io/badge/DMG-Apple_Silicon-007AFF.svg?logo=apple"></a><br>
-                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.0/CNS_1.1.0_x64.dmg"><img src="https://img.shields.io/badge/DMG-Intel-ea005e.svg?logo=apple"></a><br>
-                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.0/CNS_aarch64.app.tar.gz"><img src="https://img.shields.io/badge/APP-ARM64-34C759.svg?logo=apple"></a><br>
-                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.0/CNS_x64.app.tar.gz"><img src="https://img.shields.io/badge/APP-x64-FF9500.svg?logo=apple"></a>
+                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.1/CNS_1.1.1_aarch64.dmg"><img src="https://img.shields.io/badge/DMG-Apple_Silicon-007AFF.svg?logo=apple"></a><br>
+                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.1/CNS_1.1.1_x64.dmg"><img src="https://img.shields.io/badge/DMG-Intel-ea005e.svg?logo=apple"></a><br>
+                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.1/CNS_aarch64.app.tar.gz"><img src="https://img.shields.io/badge/APP-ARM64-34C759.svg?logo=apple"></a><br>
+                <a href="https://github.com/MercilessMarcel/CNS/releases/download/v1.1.1/CNS_x64.app.tar.gz"><img src="https://img.shields.io/badge/APP-x64-FF9500.svg?logo=apple"></a>
             </td>
         </tr>
     </tbody>

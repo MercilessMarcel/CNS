@@ -11,7 +11,7 @@ interface DiagnosticsPanelProps {
 export function DiagnosticsPanel({ isOpen }: DiagnosticsPanelProps) {
   const [logs, setLogs] = useState<ReturnType<typeof logger.getLogs>>([]);
   const [configStatus, setConfigStatus] = useState<'checking' | 'valid' | 'corrupted' | 'missing'>('checking');
-  const [appVersion] = useState('1.0.0');
+  const [appVersion] = useState('1.1.1');
   const [fileExportPath, setFileExportPath] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [isExportingFile, setIsExportingFile] = useState(false);

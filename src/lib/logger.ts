@@ -115,7 +115,7 @@ class Logger {
   export(): string {
     return JSON.stringify({
       exportedAt: new Date().toISOString(),
-      appVersion: '1.0.0',
+      appVersion: '1.1.1',
       logs: this.logs,
     }, null, 2);
   }

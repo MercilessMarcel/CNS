@@ -207,7 +207,7 @@ function App() {
         <footer className="system-footer mt-6">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-wrap items-center gap-3">
-              <span dir="ltr">CNS v1.1.0</span>
+              <span dir="ltr">CNS v1.1.1</span>
               <span className="footer-divider" />
               <span dir="rtl">{fa.warnings.rateLimit}</span>
             </div>
