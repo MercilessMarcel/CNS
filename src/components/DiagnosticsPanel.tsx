@@ -88,74 +88,65 @@ export function DiagnosticsPanel({ isOpen }: DiagnosticsPanelProps) {
 
   if (!isOpen) return null;
 
+  const configBadge =
+    configStatus === 'valid'
+      ? { Icon: CheckCircle, color: 'text-cns-highlight', label: 'Valid' }
+      : configStatus === 'missing'
+      ? { Icon: XCircle, color: 'text-cns-warning', label: 'Missing' }
+      : configStatus === 'corrupted'
+      ? { Icon: AlertCircle, color: 'text-cns-warning', label: 'Corrupted' }
+      : { Icon: AlertCircle, color: 'text-cns-deep', label: '...' };
+
   return (
-    <div className="space-y-4">
-      <div className="hud-block">
-        <div className="text-xs text-cns-primary mb-3" dir="rtl">وضعیت سیستم / System Status</div>
-        <div className="grid gap-2 text-sm">
-          <div className="flex items-center justify-between p-2 bg-black/20 rounded">
-            <span className="text-cns-primary/70">App Version</span>
-            <span className="text-cns-primary font-mono">{appVersion}</span>
+    <div className="space-y-3">
+      <div className="hud-block !p-3">
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <div className="flex flex-col gap-1 p-2 bg-black/40 border border-cns-deep/40">
+            <span className="text-[10px] uppercase tracking-wider text-cns-muted">Version</span>
+            <span className="font-mono text-cns-text-bright">{appVersion}</span>
           </div>
-          <div className="flex items-center justify-between p-2 bg-black/20 rounded">
-            <span className="text-cns-primary/70" dir="rtl">پیکربندی / Config</span>
-            <div className="flex items-center gap-2">
-              {configStatus === 'checking' && <span className="text-cns-primary/50">...</span>}
-              {configStatus === 'valid' && (
-                <>
-                  <CheckCircle size={14} className="text-green-500" />
-                  <span className="text-green-500">Valid</span>
-                </>
-              )}
-              {configStatus === 'missing' && (
-                <>
-                  <XCircle size={14} className="text-cns-warning" />
-                  <span className="text-cns-warning">Missing</span>
-                </>
-              )}
-              {configStatus === 'corrupted' && (
-                <>
-                  <AlertCircle size={14} className="text-cns-warning" />
-                  <span className="text-cns-warning">Corrupted</span>
-                </>
-              )}
-            </div>
+          <div className="flex flex-col gap-1 p-2 bg-black/40 border border-cns-deep/40">
+            <span className="text-[10px] uppercase tracking-wider text-cns-muted">Config</span>
+            <span className={cn('flex items-center gap-1 font-mono', configBadge.color)}>
+              <configBadge.Icon size={12} />
+              {configBadge.label}
+            </span>
           </div>
-          <div className="flex items-center justify-between p-2 bg-black/20 rounded">
-            <span className="text-cns-primary/70">localStorage</span>
-            <span className={cn("text-cns-primary font-mono", !localStorage && "text-cns-warning")}>
-              {typeof localStorage !== 'undefined' ? 'Available' : 'Unavailable'}
+          <div className="flex flex-col gap-1 p-2 bg-black/40 border border-cns-deep/40">
+            <span className="text-[10px] uppercase tracking-wider text-cns-muted">Storage</span>
+            <span className={cn('font-mono', !localStorage && 'text-cns-warning')}>
+              {typeof localStorage !== 'undefined' ? 'OK' : 'N/A'}
             </span>
           </div>
         </div>
       </div>
 
-      <div className="hud-block">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs text-cns-primary" dir="rtl">لاگ‌های اخیر / Recent Logs</span>
-          <button onClick={refresh} className="system-btn px-2 py-1 text-xs">
-            <RefreshCw size={12} />
+      <div className="hud-block !p-3">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs text-cns-primary" dir="rtl">لاگ‌های اخیر</span>
+          <button onClick={refresh} className="system-btn !px-2 !py-1">
+            <RefreshCw size={11} />
           </button>
         </div>
-        <div className="bg-black/30 border border-cns-deep/50 rounded p-2 max-h-40 overflow-auto font-mono text-xs">
+        <div className="bg-black/40 border border-cns-deep/40 p-2 max-h-32 overflow-auto font-mono text-[11px]">
           {logs.length === 0 ? (
-            <div className="text-cns-deep text-center py-4">No logs recorded</div>
+            <div className="text-cns-deep text-center py-3">No logs recorded</div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {logs.slice().reverse().map((log, i) => (
                 <div key={i} className="flex gap-2">
                   <span className={cn(
-                    "shrink-0",
-                    log.level === 'error' && "text-cns-warning",
-                    log.level === 'warn' && "text-yellow-500",
-                    log.level === 'info' && "text-cns-primary/50"
+                    'shrink-0 w-10',
+                    log.level === 'error' && 'text-cns-warning',
+                    log.level === 'warn' && 'text-yellow-500',
+                    log.level === 'info' && 'text-cns-primary/60'
                   )}>
                     {log.level.toUpperCase()}
                   </span>
                   <span className="text-cns-deep shrink-0">
                     {new Date(log.time).toLocaleTimeString()}
                   </span>
-                  <span className="text-cns-primary/70 truncate">{log.message}</span>
+                  <span className="text-cns-primary/80 truncate">{log.message}</span>
                 </div>
               ))}
             </div>
@@ -164,48 +155,48 @@ export function DiagnosticsPanel({ isOpen }: DiagnosticsPanelProps) {
       </div>
 
       {fileExportPath && (
-        <div className="summary-strip success text-xs p-2" dir="ltr">
-          Saved log file: <span className="font-mono break-all">{fileExportPath}</span>
+        <div className="summary-strip success text-[11px] !p-2" dir="ltr">
+          Saved: <span className="font-mono break-all">{fileExportPath}</span>
         </div>
       )}
       {exportError && (
-        <div className="summary-strip warning text-xs p-2" dir="ltr">
+        <div className="summary-strip warning text-[11px] !p-2" dir="ltr">
           Export failed: {exportError}
         </div>
       )}
 
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2">
         <button
           onClick={handleExport}
-          className="system-btn justify-center text-xs"
+          className="system-btn justify-center text-[11px]"
         >
-          <Download size={12} />
-          <span dir="rtl">دانلود لاگ / Export JSON</span>
+          <Download size={11} />
+          <span dir="rtl">دانلود JSON</span>
         </button>
 
         <button
           onClick={handleExportToFile}
           disabled={isExportingFile}
-          className="system-btn justify-center text-xs border-cns-primary"
+          className="system-btn justify-center text-[11px] border-cns-primary"
         >
-          <Download size={12} />
-          <span dir="rtl">Export logs to file</span>
+          <Download size={11} />
+          <span dir="rtl">ذخیره فایل</span>
         </button>
 
         <button
           onClick={handleClearLogs}
-          className="system-btn justify-center text-xs border-cns-deep"
+          className="system-btn justify-center text-[11px] border-cns-deep"
         >
-          <Trash2 size={12} />
-          <span dir="rtl">پاک کردن لاگ / Clear Logs</span>
+          <Trash2 size={11} />
+          <span dir="rtl">پاک کردن لاگ</span>
         </button>
 
         <button
           onClick={handleClearConfig}
-          className="system-btn justify-center text-xs border-cns-warning text-cns-warning hover:bg-cns-warning/10"
+          className="system-btn justify-center text-[11px] border-cns-warning text-cns-warning hover:bg-cns-warning/10"
         >
-          <Trash2 size={12} />
-          <span dir="rtl">پاک کردن تنظیمات / Reset</span>
+          <Trash2 size={11} />
+          <span dir="rtl">ریست کامل</span>
         </button>
       </div>
     </div>

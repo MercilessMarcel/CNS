@@ -10,11 +10,11 @@ interface InputNodeProps {
 }
 
 const QUALITY_OPTIONS = [
-  { value: 'audio', label: fa.quality.audio },
-  { value: 'best', label: fa.quality.best },
-  { value: '1080p', label: fa.quality['1080p'] },
-  { value: '720p', label: fa.quality['720p'] },
-  { value: '480p', label: fa.quality['480p'] },
+  { value: 'best', label: fa.quality.best, badge: 'BEST' },
+  { value: '1080p', label: fa.quality['1080p'], badge: '1080P' },
+  { value: '720p', label: fa.quality['720p'], badge: '720P' },
+  { value: '480p', label: fa.quality['480p'], badge: '480P' },
+  { value: 'audio', label: fa.quality.audio, badge: 'AUDIO' },
 ];
 
 const FORMAT_OPTIONS = [
@@ -98,26 +98,19 @@ export function InputNode({ onSubmit, disabled }: InputNodeProps) {
   };
 
   return (
-    <div className="space-y-5">
-      <div className={cn("summary-strip", disabled ? "muted" : "success")}>
-        <div className="space-y-1">
-          <div className="text-xs text-cns-primary" dir="rtl">
-            {disabled ? 'ارتباط گیت‌هاب هنوز کامل نشده است.' : 'سامانه آماده ارسال فرمان دریافت است.'}
-          </div>
-          <div className="helper-copy" dir="rtl">
-            {disabled
-              ? 'ابتدا از بخش تنظیمات، راه‌اندازی خودکار و سپس کوکی‌های یوتیوب را ثبت کنید.'
-              : 'پس از ثبت لینک، dispatch workflow بلافاصله به مخزن شما ارسال می‌شود.'}
-          </div>
+    <div className="space-y-4">
+      {disabled && (
+        <div className="summary-strip warning text-xs" dir="rtl">
+          ابتدا از بخش تنظیمات، توکن گیت‌هاب و کوکی‌های یوتیوب را ثبت کنید.
         </div>
-      </div>
+      )}
 
-      <div className="hud-block">
+      <div>
         <div className="flex items-center justify-between gap-3">
           <div className="field-label" dir="rtl">نشانی منبع</div>
-          <div className="micro-label" dir="ltr">YouTube / Playlist / Channel</div>
+          <div className="micro-label" dir="ltr">YouTube · Playlist · Channel</div>
         </div>
-        <label className="terminal-field mt-3">
+        <label className="terminal-field mt-2">
           <span className="terminal-prefix">TARGET</span>
           <input
             type="text"
@@ -132,32 +125,33 @@ export function InputNode({ onSubmit, disabled }: InputNodeProps) {
             spellCheck={false}
           />
         </label>
-        <div className="helper-copy mt-3" dir="rtl">{fa.input.hint}</div>
       </div>
 
-      <div className="hud-block">
+      <div>
         <div className="field-label" dir="rtl">{fa.quality.label}</div>
-        <div className="option-grid mt-3">
+        <div className="option-grid mt-2">
           {QUALITY_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               onClick={() => setQuality(opt.value)}
               disabled={disabled || isLoading}
               className={cn(
-                "option-chip",
-                quality === opt.value && "active",
-                (disabled || isLoading) && "cursor-not-allowed opacity-50"
+                'option-chip',
+                quality === opt.value && 'active',
+                (disabled || isLoading) && 'cursor-not-allowed opacity-50'
               )}
+              dir="rtl"
             >
-              <span className="min-w-0 flex-1 text-left" dir="ltr">{opt.label}</span>
+              <span className="label">{opt.label}</span>
+              <span className="badge" dir="ltr">{opt.badge}</span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="hud-block">
+      <div>
         <div className="field-label" dir="rtl">{fa.format.label}</div>
-        <div className="mt-3 grid grid-cols-3 gap-2">
+        <div className="mt-2 grid grid-cols-3 gap-2">
           {FORMAT_OPTIONS.map((opt) => {
             const Icon = opt.icon;
             return (
@@ -166,9 +160,9 @@ export function InputNode({ onSubmit, disabled }: InputNodeProps) {
                 onClick={() => setFormat(opt.value)}
                 disabled={disabled || isLoading}
                 className={cn(
-                  "format-tile",
-                  format === opt.value && "active",
-                  (disabled || isLoading) && "cursor-not-allowed opacity-50"
+                  'format-tile',
+                  format === opt.value && 'active',
+                  (disabled || isLoading) && 'cursor-not-allowed opacity-50'
                 )}
               >
                 <Icon size={15} />
@@ -180,8 +174,8 @@ export function InputNode({ onSubmit, disabled }: InputNodeProps) {
       </div>
 
       {error && (
-        <div className="summary-strip warning text-xs text-cns-warning">
-          <span dir="ltr">[ERROR]</span> <span dir="ltr">{error}</span>
+        <div className="summary-strip warning text-xs text-cns-warning" dir="ltr">
+          <span>[ERROR]</span> <span>{error}</span>
         </div>
       )}
 
@@ -189,11 +183,11 @@ export function InputNode({ onSubmit, disabled }: InputNodeProps) {
         onClick={handleSubmit}
         disabled={disabled || isLoading}
         className={cn(
-          "system-btn submit-btn w-full justify-center",
-          disabled && "cursor-not-allowed opacity-50"
+          'system-btn submit-btn w-full justify-center',
+          disabled && 'cursor-not-allowed opacity-50'
         )}
       >
-        <Play size={14} className="ml-2" />
+        <Play size={14} />
         <span dir="rtl">{isLoading ? fa.actions.processing : fa.actions.download}</span>
       </button>
     </div>
