@@ -681,6 +681,38 @@ class GitHubClient {
     }
   }
 
+  async getFileCommitTime(path: string): Promise<string | null> {
+    const config = this.getConfig();
+    if (!config) return null;
+    try {
+      const data = await this.request(
+        `/repos/${config.owner}/${config.repo}/commits?path=${encodeURIComponent(path)}&per_page=1`
+      );
+      if (Array.isArray(data) && data.length > 0) {
+        return data[0]?.commit?.committer?.date ?? data[0]?.commit?.author?.date ?? null;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  async downloadFileAsBlob(sha: string): Promise<Blob> {
+    const config = this.getConfig();
+    if (!config) throw new Error('GitHub config not set');
+    const response = await fetch(
+      `https://api.github.com/repos/${config.owner}/${config.repo}/git/blobs/${sha}`,
+      {
+        headers: {
+          Authorization: `token ${config.token}`,
+          Accept: 'application/vnd.github.raw',
+        },
+      }
+    );
+    if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+    return response.blob();
+  }
+
   async deleteFile(path: string, sha: string): Promise<void> {
     const config = this.getConfig();
     if (!config) throw new Error('GitHub config not set');
