@@ -9,16 +9,17 @@ export default {
       colors: {
         cns: {
           bg: '#050505',
-          primary: '#8FAF8C',
-          secondary: '#7E9E7B',
-          highlight: '#A3C2A0',
-          deep: '#5F7A5C',
+          primary: '#92B0A6',
+          secondary: '#6E8C80',
+          highlight: '#B8D8CC',
+          deep: '#4E6A60',
           warning: '#FF3B3B',
-          dim: 'rgba(143, 175, 140, 0.1)',
+          dim: 'rgba(160, 200, 184, 0.08)',
         }
       },
       fontFamily: {
-        mono: ['Courier New', 'Consolas', 'Monaco', 'monospace'],
+        sans: ['Vazirmatn', 'Tahoma', 'Segoe UI', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Courier New', 'Consolas', 'Monaco', 'monospace'],
       },
       animation: {
         'glitch': 'glitch 0.3s ease-in-out',
