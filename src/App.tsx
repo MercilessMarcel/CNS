@@ -1,5 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Terminal, Radio, Archive, Settings } from 'lucide-react';
+import {
+  Terminal,
+  Radio,
+  Archive,
+  Settings,
+  AlertCircle,
+} from 'lucide-react';
 import { fa } from './lib/i18n';
 import { github, DownloadJob } from './lib/github';
 import { logger } from './lib/logger';
@@ -8,21 +14,18 @@ import { InputNode } from './components/InputNode';
 import { SignalFeed } from './components/SignalFeed';
 import { ArchivePanel } from './components/ArchivePanel';
 import { SettingsModal } from './components/SettingsModal';
+import { MatrixRain } from './components/MatrixRain';
+import { AsciiLogo } from './components/AsciiLogo';
 
-const MATRIX_COLUMNS = [
-  '101001011001',
-  'CNS-STREAM',
-  '010110100111',
-  'WORKFLOW',
-  '110010101001',
-  'SIGNAL-FEED',
-  '001011011010',
-  'ARCHIVE-NODE',
-  '010011100101',
-  'DOWNLOAD',
-  '100110101010',
-  'GITHUB-ACT',
-] as const;
+function WindowControls() {
+  return (
+    <span className="window-controls" aria-hidden="true">
+      <span className="window-dot" data-glyph="_" />
+      <span className="window-dot" data-glyph="□" />
+      <span className="window-dot close" data-glyph="×" />
+    </span>
+  );
+}
 
 function App() {
   const [jobs, setJobs] = useState<DownloadJob[]>([]);
@@ -50,6 +53,7 @@ function App() {
   const handleJobSubmit = useCallback((job: DownloadJob) => {
     setJobs(prev => [job, ...prev]);
     setActiveTab('feed');
+    window.dispatchEvent(new CustomEvent('cns-matrix-burst'));
   }, []);
 
   const handleJobUpdate = useCallback((jobId: string, updates: Partial<DownloadJob>) => {
@@ -65,83 +69,78 @@ function App() {
 
   const activeJobs = jobs.filter(job => job.status === 'pending' || job.status === 'running').length;
   const completedJobs = jobs.filter(job => job.status === 'success').length;
-  const heroMetrics = [
-    { label: 'LIVE', value: String(activeJobs) },
-    { label: 'DONE', value: String(completedJobs) },
-    { label: 'SYNC', value: initError ? 'ERROR' : hasConfig ? 'ONLINE' : 'OFFLINE' },
+  const syncLabel = initError ? 'ERROR' : hasConfig ? 'ONLINE' : 'OFFLINE';
+  const syncWarn = !!initError || !hasConfig;
+
+  const tabs: Array<{ id: typeof activeTab; label: string; icon: typeof Terminal }> = [
+    { id: 'input', label: 'INPUT', icon: Terminal },
+    { id: 'feed', label: 'FEED', icon: Radio },
+    { id: 'archive', label: 'ARCHIVE', icon: Archive },
   ];
 
   return (
-    <div className="min-h-screen bg-cns-bg p-4 text-cns-primary md:p-6">
+    <div className="min-h-screen bg-cns-bg p-4 text-cns-primary md:p-6 pb-20">
       <div className="green-tint" />
-      <div className="matrix-rain" aria-hidden="true">
-        {MATRIX_COLUMNS.map((column, index) => (
-          <span
-            key={`${column}-${index}`}
-            className="matrix-column"
-            style={{
-              right: `${4 + index * 8}%`,
-              animationDelay: `${(index % 6) * -3.2}s`,
-              animationDuration: `${16 + (index % 5) * 3}s`,
-            }}
-          >
-            {column}
-          </span>
-        ))}
-      </div>
+      <MatrixRain />
       <div className="shell-grid" />
       <div className="shell-glow" />
 
-      <div className="relative mx-auto max-w-7xl">
+      <div className="relative z-10 mx-auto max-w-7xl">
         {initError && (
-          <div className="mb-4 p-3 border border-cns-warning/50 bg-cns-warning/10 rounded-lg">
-            <div className="text-cns-warning text-sm" dir="rtl">
-              خطای راه‌اندازی: {initError}
+          <div className="mb-4 p-3 border border-cns-warning/50 bg-cns-warning/10 rounded-sm">
+            <div className="flex items-center gap-2 text-cns-warning text-sm" dir="rtl">
+              <AlertCircle size={14} />
+              <span>خطای راه‌اندازی: {initError}</span>
             </div>
           </div>
         )}
 
-        <header className="flex items-center justify-between mb-6 p-4 border border-cns-primary/30 rounded-lg bg-cns-bg">
-          <h1 className="text-lg font-mono text-cns-highlight" dir="rtl">{fa.app.title}</h1>
-          <div className="flex items-center gap-2">
-            {heroMetrics.map((metric) => (
-              <div key={metric.label} className="console-tile" dir="ltr">
-                <span>{metric.label}</span>
-                <strong>{metric.value}</strong>
-              </div>
-            ))}
-            <div
-              onClick={() => setIsSettingsOpen(true)}
-              className={cn(
-                "console-tile cursor-pointer",
-                !hasConfig && "border-cns-warning text-cns-warning"
-              )}
-              dir="ltr"
-            >
-              <Settings size={28} />
-            </div>
+        <section className="hero-mark">
+          <AsciiLogo />
+          <div className="hero-metrics">
+            <span className="hero-metric">
+              LIVE <strong>{activeJobs.toString().padStart(2, '0')}</strong>
+            </span>
+            <span className="hero-metric">
+              DONE <strong>{completedJobs.toString().padStart(2, '0')}</strong>
+            </span>
+            <span className={cn('hero-metric', syncWarn && 'warn')}>
+              SYNC <strong>{syncLabel}</strong>
+            </span>
           </div>
-        </header>
+        </section>
+
+        <nav className="mb-4 grid grid-cols-3 gap-2 md:hidden" aria-label="panels">
+          {tabs.map((t) => {
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                className={cn('nav-tab', activeTab === t.id && 'active')}
+              >
+                <Icon size={12} />
+                <span dir="ltr">{t.label}</span>
+              </button>
+            );
+          })}
+        </nav>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
           <section
             className={cn(
-              "panel-shell flex flex-col md:col-span-4",
+              'window md:col-span-4',
               activeTab !== 'input' && 'hidden md:flex'
             )}
           >
-            <div className="panel-head">
-              <div>
-                <div className="section-label">
-                  <Terminal size={12} />
-                </div>
-                <p className="panel-subtitle" dir="rtl">
-                  لینک را وارد کنید، کیفیت را مشخص کنید و فرمان دریافت را به workflow بفرستید.
-                </p>
-              </div>
-              <span className="panel-index" dir="ltr">01</span>
-            </div>
-            <div className="panel-body p-4 md:p-5">
+            <header className="window-titlebar">
+              <span className="window-name">
+                <Terminal size={12} />
+                INPUT.EXE
+              </span>
+              <WindowControls />
+            </header>
+            <div className="window-body">
               <InputNode
                 onSubmit={handleJobSubmit}
                 disabled={!hasConfig}
@@ -151,29 +150,26 @@ function App() {
 
           <section
             className={cn(
-              "panel-shell flex flex-col md:col-span-5 md:min-h-[620px]",
+              'window md:col-span-5 md:min-h-[620px]',
               activeTab !== 'feed' && 'hidden md:flex'
             )}
           >
-            <div className="panel-head">
-              <div>
-                <div className="section-label">
-                  <Radio size={12} className={activeJobs > 0 ? 'animate-pulse-signal' : ''} />
-                  {activeJobs > 0 && (
-                    <span className="signal-active mr-2 text-cns-highlight">
-                      <span dir="ltr">{activeJobs.toLocaleString('fa-IR')} LIVE</span>
-                    </span>
-                  )}
-                </div>
-                <p className="panel-subtitle" dir="rtl">
-                  {activeJobs > 0
-                    ? `${activeJobs.toLocaleString('fa-IR')} عملیات در حال پیگیری است و لاگ‌ها به صورت خودکار تازه می‌شوند.`
-                    : 'به محض ثبت اولین لینک، لاگ‌های اجرای workflow در این بخش ظاهر می‌شوند.'}
-                </p>
-              </div>
-              <span className="panel-index" dir="ltr">02</span>
-            </div>
-            <div className="panel-body p-4 md:p-5">
+            <header className="window-titlebar">
+              <span className="window-name">
+                <Radio
+                  size={12}
+                  className={activeJobs > 0 ? 'animate-pulse-signal' : ''}
+                />
+                FEED.EXE
+                {activeJobs > 0 && (
+                  <span className="ms-2 text-cns-highlight" dir="ltr">
+                    [{activeJobs.toLocaleString('en-US')}]
+                  </span>
+                )}
+              </span>
+              <WindowControls />
+            </header>
+            <div className="window-body">
               <SignalFeed
                 jobs={jobs}
                 onUpdate={handleJobUpdate}
@@ -183,45 +179,50 @@ function App() {
 
           <section
             className={cn(
-              "panel-shell flex flex-col md:col-span-3 md:min-h-[620px]",
+              'window md:col-span-3 md:min-h-[620px]',
               activeTab !== 'archive' && 'hidden md:flex'
             )}
           >
-            <div className="panel-head">
-              <div>
-                <div className="section-label">
-                  <Archive size={12} />
-                </div>
-                <p className="panel-subtitle" dir="rtl">
-                  خروجی‌های ذخیره‌شده، تصویر بندانگشتی و عملیات دانلود یا حذف در همین ستون.
-                </p>
-              </div>
-              <span className="panel-index" dir="ltr">03</span>
-            </div>
-            <div className="panel-body p-4 md:p-5">
+            <header className="window-titlebar">
+              <span className="window-name">
+                <Archive size={12} />
+                ARCHIVE.EXE
+              </span>
+              <WindowControls />
+            </header>
+            <div className="window-body">
               <ArchivePanel refreshKey={archiveRefreshKey} />
             </div>
           </section>
         </div>
 
-        <footer className="system-footer mt-6">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-wrap items-center gap-3">
-              <span dir="ltr">CNS v1.1.1</span>
-              <span className="footer-divider" />
-              <span dir="rtl">{fa.warnings.rateLimit}</span>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={cn("status-pill", hasConfig ? "success" : "muted")} dir="rtl">
-                {hasConfig ? 'اتصال آماده' : 'نیاز به تنظیمات'}
-              </span>
-              <span className="status-pill" dir="rtl">
-                {completedJobs.toLocaleString('fa-IR')} دریافت موفق
-              </span>
-            </div>
-          </div>
+        <footer className="status-bar" dir="ltr">
+          <span className="left">
+            <span>&gt; SYSTEM STATUS:</span>
+            <strong>{syncLabel}</strong>
+            <span className="sep">//</span>
+            <span>GITHUB LINK:</span>
+            <strong>{hasConfig ? 'STABLE' : 'IDLE'}</strong>
+          </span>
+          <span className="right caret">
+            <span>JOBS</span>
+            <strong>{completedJobs.toString().padStart(2, '0')}/{(jobs.length).toString().padStart(2, '0')}</strong>
+          </span>
         </footer>
       </div>
+
+      <aside className="utility-dock" aria-label="utilities">
+        <button
+          type="button"
+          onClick={() => setIsSettingsOpen(true)}
+          className={cn('utility-btn', !hasConfig && 'warn')}
+          aria-label="settings"
+          title={fa.actions.settings}
+        >
+          <Settings size={14} />
+        </button>
+        <span className="utility-version">v1.1.1</span>
+      </aside>
 
       <SettingsModal
         isOpen={isSettingsOpen}
