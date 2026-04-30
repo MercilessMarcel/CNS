@@ -43,8 +43,29 @@ function extractLiveStep(jobs: any[]): string | null {
   return null;
 }
 
+function extractFailedStep(jobs: any[]): string | null {
+  for (const job of jobs) {
+    const failedStep = job.steps?.find((step: any) => step.conclusion === 'failure');
+    if (failedStep?.name) return failedStep.name;
+    if (job.conclusion === 'failure' && job.name) return job.name;
+  }
+  return null;
+}
+
+function getFailureMessage(stepName: string | null) {
+  if (!stepName) return fa.feed.error;
+  if (/cookie/i.test(stepName)) {
+    return 'کوکی‌های یوتیوب پیدا نشد. از تنظیمات، cookies.txt جدید را وارد و دوباره ذخیره کنید.';
+  }
+  if (/download/i.test(stepName)) {
+    return 'یوتیوب دانلود را به دلیل کوکی منقضی یا تأیید بات مسدود کرد. از مرورگری که داخل یوتیوب لاگین است cookies.txt جدید بگیرید و در تنظیمات ذخیره کنید.';
+  }
+  return `خطا در مرحله: ${stepName}`;
+}
+
 export function SignalFeed({ jobs, onUpdate }: SignalFeedProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const logRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const lastStepRef = useRef<Record<string, string>>({});
   const lastHeartbeatRef = useRef<Record<string, number>>({});
 
@@ -55,9 +76,19 @@ export function SignalFeed({ jobs, onUpdate }: SignalFeedProps) {
     });
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = 0;
-    }
+    const latestActive = jobs.find(job => job.status === 'pending' || job.status === 'running') ?? jobs[0];
+    if (!latestActive) return;
+
+    requestAnimationFrame(() => {
+      logRefs.current[latestActive.id]?.scrollTo({
+        top: logRefs.current[latestActive.id]?.scrollHeight ?? 0,
+        behavior: 'smooth',
+      });
+      scrollRef.current?.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      });
+    });
   }, [jobs]);
 
   useEffect(() => {
@@ -83,13 +114,19 @@ export function SignalFeed({ jobs, onUpdate }: SignalFeedProps) {
             let logs = job.logs;
             let shouldUpdate = false;
 
+            const liveJobs = await github.getWorkflowRunJobs(matchingRun.id).catch(() => []);
+
             if (status === 'running') {
-              const liveJobs = await github.getWorkflowRunJobs(matchingRun.id).catch(() => []);
               const liveStep = extractLiveStep(liveJobs);
               const now = Date.now();
+              const formatLabel = job.format.toUpperCase();
+              const qualityLabel = job.quality === 'audio' ? 'فقط صدا' : `${job.quality}P`;
 
               if (job.status === 'pending') {
-                logs = appendLog(logs, `[${new Date().toLocaleTimeString('fa-IR')}] ${fa.feed.downloading}`);
+                logs = appendLog(
+                  logs,
+                  `[${new Date().toLocaleTimeString('fa-IR')}] دانلود ${qualityLabel} (${formatLabel}) آغاز شد`
+                );
                 shouldUpdate = true;
               }
 
@@ -101,7 +138,7 @@ export function SignalFeed({ jobs, onUpdate }: SignalFeedProps) {
               } else if (now - (lastHeartbeatRef.current[job.id] ?? 0) >= HEARTBEAT_INTERVAL_MS) {
                 const heartbeatText = liveStep
                   ? `در حال اجرا: ${liveStep}`
-                  : 'در حال اجرا...';
+                  : 'در حال دانلود...';
                 logs = appendLog(logs, `[${new Date().toLocaleTimeString('fa-IR')}] ${heartbeatText}`);
                 lastHeartbeatRef.current[job.id] = now;
                 shouldUpdate = true;
@@ -115,7 +152,8 @@ export function SignalFeed({ jobs, onUpdate }: SignalFeedProps) {
               if (status === 'success') {
                 logs = appendLog(logs, `[${new Date().toLocaleTimeString('fa-IR')}] ${fa.feed.complete}`);
               } else if (status === 'failed') {
-                logs = appendLog(logs, `[${new Date().toLocaleTimeString('fa-IR')}] ${fa.feed.error}`);
+                const failedStep = extractFailedStep(liveJobs);
+                logs = appendLog(logs, `[${new Date().toLocaleTimeString('fa-IR')}] ${getFailureMessage(failedStep)}`);
               }
               shouldUpdate = true;
             }
@@ -142,15 +180,12 @@ export function SignalFeed({ jobs, onUpdate }: SignalFeedProps) {
 
   if (jobs.length === 0) {
     return (
-      <div className="empty-state h-full">
-        <div className="text-center">
-          <Terminal size={34} className="mx-auto mb-3 opacity-60" />
-          <div className="text-sm text-cns-primary" dir="rtl">{fa.feed.waiting}</div>
-          <div className="helper-copy mt-2 max-w-[26rem]" dir="rtl">
-            اولین عملیات را از ستون ورودی شروع کنید تا لاگ‌های اجرای workflow در این پنجره ظاهر شوند.
-          </div>
-          <div className="mt-3 text-[10px] opacity-50" dir="ltr">SYSTEM_STANDBY</div>
-        </div>
+      <div className="empty-tile">
+        <span className="glyph">
+          <Terminal size={20} />
+        </span>
+        <div className="text-sm text-cns-primary" dir="rtl">{fa.feed.waiting}</div>
+        <div className="text-[10px] opacity-60" dir="ltr">SYSTEM_STANDBY</div>
       </div>
     );
   }
@@ -216,7 +251,12 @@ export function SignalFeed({ jobs, onUpdate }: SignalFeedProps) {
               </div>
             )}
 
-            <div className="log-surface mt-3">
+            <div
+              ref={(node) => {
+                logRefs.current[job.id] = node;
+              }}
+              className="log-surface mt-3"
+            >
               {job.logs.map((log, i) => (
                 <div
                   key={i}
