@@ -80,6 +80,28 @@ body {
   font-feature-settings: 'ss01', 'ss02', 'ss03';
 }
 
+#root :where(
+  p,
+  span,
+  a,
+  button,
+  label,
+  li,
+  strong,
+  em,
+  b,
+  i,
+  small,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6
+):not([dir='ltr']) {
+  unicode-bidi: plaintext;
+}
+
 a {
   color: inherit;
 }
@@ -132,6 +154,18 @@ body::after {
   opacity: 0.38;
   mask-image: linear-gradient(180deg, transparent 0%, black 6%, black 94%, transparent 100%);
   -webkit-mask-image: linear-gradient(180deg, transparent 0%, black 6%, black 94%, transparent 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .matrix-canvas {
+    display: none;
+  }
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 .shell-grid,
@@ -704,6 +738,29 @@ body::after {
   border: 1px solid var(--cns-line-soft);
   background: rgba(0, 0, 0, 0.32);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.settings-tab-panels {
+  position: relative;
+  min-height: 24rem;
+}
+
+.settings-tab-panel {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px) scale(0.985);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.settings-tab-panel.active {
+  position: relative;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
 }
 
 .parts-hero {
@@ -2252,6 +2309,10 @@ select,
 
   .settings-tabs {
     width: 100%;
+  }
+
+  .settings-tab-panels {
+    min-height: 21rem;
   }
 
   .settings-tab {
