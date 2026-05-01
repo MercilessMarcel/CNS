@@ -49,6 +49,7 @@ const POLL_ACTIVE_MS = 5000;
 const POLL_IDLE_MS = 10000;
 const POLL_BACKOFF_MS = 20000;
 const JOB_FETCH_CONCURRENCY = 4;
+const PROGRESS_RAIL_SHIMMER_PCT = 32;
 
 function isActiveJobStatus(s: DownloadJob['status']) {
   return s === 'pending' || s === 'running';
@@ -896,6 +897,8 @@ const ResultCard = memo(function ResultCard({
     ? persianStepLabel(job.githubLiveStep)
     : persianLogLine(latestLog);
   const progress = job ? computeProgress(job) : 100;
+  const shimmerRailEnd = 100 - PROGRESS_RAIL_SHIMMER_PCT;
+  const shimmerLeftStart = Math.min(Math.max(0, progress), shimmerRailEnd);
   const liveStatus =
     job?.githubLiveStep != null && job.githubLiveStep !== ''
       ? persianStepLabel(job.githubLiveStep)
@@ -960,7 +963,17 @@ const ResultCard = memo(function ResultCard({
                 <span className="live-status-value">{liveStatus}</span>
                 <span className="live-progress-text">{progress.toLocaleString('fa-IR')}٪</span>
               </div>
-              <div className="progress-rail" data-progress={progress}>
+              <div
+                className="progress-rail"
+                data-progress={progress}
+                style={
+                  {
+                    '--shimmer-w': `${PROGRESS_RAIL_SHIMMER_PCT}%`,
+                    '--shimmer-left-0': `${shimmerLeftStart}%`,
+                    '--shimmer-left-1': `${shimmerRailEnd}%`,
+                  } as React.CSSProperties
+                }
+              >
                 <div
                   className="progress-rail-fill"
                   style={{ width: `${progress}%` }}

@@ -461,7 +461,7 @@ jobs:
           git config user.email "cns@system.local"
           
           git restore cookies.txt 2>/dev/null || git checkout HEAD -- cookies.txt 2>/dev/null || true
-          git add -A -- downloads/
+          git add --sparse -A -- downloads/
           
           if git diff --cached --quiet; then
             echo "No changes to commit"
