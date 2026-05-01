@@ -1,0 +1,10 @@
+---
+description: After code changes, commit and push to origin
+alwaysApply: true
+---
+
+# Git: commit and push
+
+When you change tracked project files and the user did not forbid it, finish with `git add` (scoped to what you touched), `git commit` on the current branch, and `git push` to `origin` for that branch. If push fails (auth, network), report the error and leave the commit local.
+
+Skip only if the user explicitly says not to commit/push or the repo has no remote.
