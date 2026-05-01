@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Save, AlertCircle, Zap, Activity, Settings as SettingsIcon } from 'lucide-react';
 import { fa } from '../lib/i18n';
 import { github } from '../lib/github';
@@ -23,9 +23,12 @@ export function SettingsModal({ isOpen, onClose, onConfigChanged }: SettingsModa
   const [activeTab, setActiveTab] = useState<'settings' | 'diagnostics'>('settings');
   const [mounted, setMounted] = useState(isOpen);
   const [closing, setClosing] = useState(false);
+  const [cookiesUploadState, setCookiesUploadState] = useState<'idle' | 'busy' | 'ok'>('idle');
+  const cookiesOkTimerRef = useRef<number | null>(null);
   const hasSavedConfig = !!github.getConfig();
 
   useEffect(() => {
+    let closeTimer: number | null = null;
     if (isOpen) {
       setMounted(true);
       setClosing(false);
@@ -35,14 +38,25 @@ export function SettingsModal({ isOpen, onClose, onConfigChanged }: SettingsModa
         setRepoName(config.repo);
       }
       setError(null);
+      if (cookiesOkTimerRef.current != null) {
+        window.clearTimeout(cookiesOkTimerRef.current);
+        cookiesOkTimerRef.current = null;
+      }
+      setCookiesUploadState('idle');
     } else if (mounted) {
       setClosing(true);
-      const t = window.setTimeout(() => {
+      closeTimer = window.setTimeout(() => {
         setMounted(false);
         setClosing(false);
       }, 220);
-      return () => window.clearTimeout(t);
     }
+    return () => {
+      if (closeTimer != null) window.clearTimeout(closeTimer);
+      if (cookiesOkTimerRef.current != null) {
+        window.clearTimeout(cookiesOkTimerRef.current);
+        cookiesOkTimerRef.current = null;
+      }
+    };
   }, [isOpen, mounted]);
 
   const handleSave = async () => {
@@ -90,6 +104,7 @@ export function SettingsModal({ isOpen, onClose, onConfigChanged }: SettingsModa
     }
 
     setError(null);
+    setCookiesUploadState('busy');
     try {
       let config = github.getConfig();
       if (!config) {
@@ -103,11 +118,18 @@ export function SettingsModal({ isOpen, onClose, onConfigChanged }: SettingsModa
       }
       onConfigChanged?.();
     } catch (err) {
+      setCookiesUploadState('idle');
       setError(toPersianErrorMessage(err));
       return;
     }
 
     setCookies('');
+    setCookiesUploadState('ok');
+    if (cookiesOkTimerRef.current != null) window.clearTimeout(cookiesOkTimerRef.current);
+    cookiesOkTimerRef.current = window.setTimeout(() => {
+      cookiesOkTimerRef.current = null;
+      setCookiesUploadState('idle');
+    }, 2800);
   };
 
   const handleAutoSetup = async () => {
@@ -323,11 +345,17 @@ export function SettingsModal({ isOpen, onClose, onConfigChanged }: SettingsModa
 
                 <button
                   onClick={() => void handleSaveCookies()}
-                  disabled={!canSaveCookies}
+                  disabled={!canSaveCookies || cookiesUploadState === 'busy'}
                   className="system-btn mt-2 w-full justify-center"
                 >
                   <Save size={12} />
-                  <span dir="ltr">{fa.settings.cookiesSaved}</span>
+                  <span dir="ltr">
+                    {cookiesUploadState === 'busy'
+                      ? fa.settings.uploadingCookies
+                      : cookiesUploadState === 'ok'
+                        ? fa.settings.cookiesSaved
+                        : fa.settings.uploadCookies}
+                  </span>
                 </button>
               </div>
 
