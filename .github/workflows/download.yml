@@ -289,14 +289,25 @@ jobs:
         git config user.name "CNS Downloader"
         git config user.email "cns@system.local"
 
-        git add downloads/
+        git restore cookies.txt 2>/dev/null || git checkout HEAD -- cookies.txt 2>/dev/null || true
+        git add -A -- downloads/
 
         if git diff --cached --quiet; then
           echo "No changes to commit"
         else
           git commit -m "CNS: Download $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-          git push || echo "Push failed, retrying..."
-          echo "Committed and pushed"
+          for attempt in 1 2 3; do
+            git restore cookies.txt 2>/dev/null || git checkout HEAD -- cookies.txt 2>/dev/null || true
+            git pull --rebase --autostash origin main
+            if git push; then
+              echo "Committed and pushed"
+              exit 0
+            fi
+            echo "Push failed, retrying after syncing remote (attempt $attempt/3)"
+            sleep 5
+          done
+          echo "Push failed after retries"
+          exit 1
         fi
 
     - name: Cleanup old downloads
