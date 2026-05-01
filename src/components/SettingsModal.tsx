@@ -145,8 +145,8 @@ export function SettingsModal({ isOpen, onClose, onConfigChanged }: SettingsModa
     setSetupStep(fa.settings.creatingRepo);
 
     try {
-      await github.autoSetup(token, 'cns-downloads');
-      setSetupStep(fa.settings.addingWorkflow);
+      const result = await github.autoSetup(token, 'cns-downloads');
+      setSetupStep(result.repoCreated ? fa.settings.setupDone : fa.settings.repoUpdated);
       onConfigChanged?.();
       setTimeout(() => {
         onClose();

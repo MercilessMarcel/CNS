@@ -1019,7 +1019,7 @@ class GitHubClient {
   }
 
   // Auto-setup: Create repo and workflow file
-  async createRepo(name: string, token: string): Promise<{ owner: string; repo: string }> {
+  async createRepo(name: string, token: string): Promise<{ owner: string; repo: string; created: boolean }> {
     // Create repo using user endpoint
     const response = await fetch(`${API_BASE}/user/repos`, {
       method: 'POST',
@@ -1039,11 +1039,19 @@ class GitHubClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
+      const message = String((error as Record<string, unknown>).message || '');
+      if (
+        response.status === 422 &&
+        message.toLowerCase().includes('name already exists on this account')
+      ) {
+        const user = await this.requestWithToken(token, '/user');
+        return { owner: user.login, repo: name, created: false };
+      }
       throw new Error(error.message || `Failed to create repo: HTTP ${response.status}`);
     }
 
     const data = await response.json();
-    return { owner: data.owner.login, repo: data.name };
+    return { owner: data.owner.login, repo: data.name, created: true };
   }
 
   async setupWorkflow(token: string, owner: string, repo: string, sha?: string): Promise<void> {
@@ -1075,9 +1083,9 @@ class GitHubClient {
     }
   }
 
-  async autoSetup(token: string, repoName: string = 'cns-downloads'): Promise<GitHubConfig> {
+  async autoSetup(token: string, repoName: string = 'cns-downloads'): Promise<{ config: GitHubConfig; repoCreated: boolean }> {
     // Step 1: Create repo
-    const { owner, repo } = await this.createRepo(repoName, token);
+    const { owner, repo, created } = await this.createRepo(repoName, token);
     
     // Step 2: Setup workflow
     await this.setupWorkflow(token, owner, repo);
@@ -1086,7 +1094,7 @@ class GitHubClient {
     const config: GitHubConfig = { token, owner, repo };
     this.setConfig(config);
     
-    return config;
+    return { config, repoCreated: created };
   }
 
   // Cookies management
