@@ -4,13 +4,15 @@ import { fa } from '../lib/i18n';
 import { github } from '../lib/github';
 import { cn } from '../lib/utils';
 import { DiagnosticsPanel } from './DiagnosticsPanel';
+import { toPersianErrorMessage } from '../lib/errors';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onConfigChanged?: () => void;
 }
 
-export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
+export function SettingsModal({ isOpen, onClose, onConfigChanged }: SettingsModalProps) {
   const [token, setToken] = useState('');
   const [repoName, setRepoName] = useState('cns-downloads');
   const [cookies, setCookies] = useState('');
@@ -59,37 +61,49 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         const attached = await github.connectExistingRepo(token, repoName.trim() || 'cns-downloads');
         await github.ensureWorkflow(token, attached.owner, attached.repo);
       }
+      onConfigChanged?.();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'خطا در اتصال به مخزن موجود');
+      setError(toPersianErrorMessage(err));
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
   };
 
   const handleClear = () => {
     github.clearConfig();
     setToken('');
+    setRepoName('cns-downloads');
+    onConfigChanged?.();
   };
 
+  const canSaveCookies =
+    !!cookies.trim() && (!!github.getConfig() || !!token.trim());
+
   const handleSaveCookies = async () => {
-    if (!cookies.trim()) return;
+    const trimmed = cookies.trim();
+    if (!trimmed) return;
 
-    localStorage.setItem('cns_cookies', cookies.trim());
+    if (!github.getConfig() && !token.trim()) {
+      setError('توکن گیت‌هاب الزامی است');
+      return;
+    }
 
+    setError(null);
     try {
       let config = github.getConfig();
       if (!config) {
-        if (!token) {
-          setError('توکن گیت‌هاب الزامی است');
-          return;
-        }
-        config = await github.connectExistingRepo(token, repoName.trim() || 'cns-downloads');
-        await github.ensureWorkflow(token, config.owner, config.repo);
+        config = await github.connectExistingRepo(token.trim(), repoName.trim() || 'cns-downloads');
+        await github.ensureWorkflow(token.trim(), config.owner, config.repo);
       }
-      await github.uploadCookies(cookies.trim());
-      setError(null);
+      await github.uploadCookies(trimmed);
+      try {
+        localStorage.setItem('cns_cookies', trimmed);
+      } catch {
+      }
+      onConfigChanged?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'خطا در آپلود کوکی‌ها');
+      setError(toPersianErrorMessage(err));
       return;
     }
 
@@ -109,11 +123,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     try {
       await github.autoSetup(token, 'cns-downloads');
       setSetupStep(fa.settings.addingWorkflow);
+      onConfigChanged?.();
       setTimeout(() => {
         onClose();
       }, 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'خطا در راه‌اندازی خودکار');
+      setError(toPersianErrorMessage(err));
     } finally {
       setIsAutoSetup(false);
       setSetupStep('');
@@ -125,43 +140,59 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
       <div
-        className={cn('modal-backdrop absolute inset-0 bg-black/55 backdrop-blur-[2px]', closing && 'closing')}
+        className={cn('modal-backdrop absolute inset-0 bg-black/70 backdrop-blur-[2px]', closing && 'closing')}
         onClick={onClose}
       />
 
-      <div className={cn('window modal-shell relative w-full max-w-2xl', closing && 'closing')} dir="ltr">
-        <header className="window-titlebar">
-          <span className="window-name">
-            <SettingsIcon size={12} />
-            SETTINGS.EXE
-          </span>
-          <span className="window-controls">
-            <span className="window-dot" data-glyph="_" />
-            <span className="window-dot" data-glyph="□" />
-            <button onClick={onClose} className="window-dot close" aria-label="close" type="button">×</button>
-          </span>
+      <div
+        className={cn(
+          'settings-dialog modal-shell relative w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden',
+          closing && 'closing'
+        )}
+        dir="ltr"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="settings-dialog-header">
+          <div className="settings-dialog-header-main">
+            <div className="settings-dialog-title">
+              <SettingsIcon size={18} strokeWidth={2.2} />
+              <span>تنظیمات دانلود</span>
+            </div>
+            <p className="settings-dialog-subtitle">
+              برای دانلود، اول مخزن گیت‌هاب و کوکی‌های یوتیوب را تنظیم کنید.
+            </p>
+          </div>
+          <button onClick={onClose} className="settings-close-btn" type="button">
+            بستن
+          </button>
         </header>
 
-        <div className="window-body" style={{ paddingTop: '0.85rem', paddingBottom: '0.85rem' }}>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-1">
+        <div className="settings-dialog-body">
+          <div className="settings-top-row">
+            <div className="settings-tabs">
               <button
                 onClick={() => setActiveTab('settings')}
-                className={cn('nav-tab', activeTab === 'settings' && 'active')}
-                dir="rtl"
+                className={cn('settings-tab', activeTab === 'settings' && 'active')}
+                dir="ltr"
               >
                 <SettingsIcon size={12} />
                 <span>تنظیمات</span>
               </button>
               <button
                 onClick={() => setActiveTab('diagnostics')}
-                className={cn('nav-tab', activeTab === 'diagnostics' && 'active')}
+                className={cn('settings-tab', activeTab === 'diagnostics' && 'active')}
               >
                 <Activity size={12} />
-                <span>Diagnostics</span>
+                <span>عیب‌یابی</span>
               </button>
             </div>
-            <span className={cn('status-pill', hasSavedConfig ? 'success' : 'warning')} dir="rtl">
+            <span
+              className={cn(
+                'settings-config-status',
+                hasSavedConfig ? 'settings-config-status--ok' : 'settings-config-status--warn'
+              )}
+              dir="ltr"
+            >
               {hasSavedConfig ? 'پیکربندی ذخیره شده' : 'بدون مخزن'}
             </span>
           </div>
@@ -170,12 +201,19 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <DiagnosticsPanel isOpen={isOpen} />
           ) : (
           <div className="grid gap-3 md:grid-cols-2">
-            <section className="space-y-3">
-              <div className="hud-block !p-3 space-y-3">
+            <section className="settings-section">
+              <div className="settings-section-head">
+                <span className="settings-step">۱</span>
+                <div>
+                  <h3>اتصال به گیت‌هاب</h3>
+                  <p>توکن را وارد کنید. مخزن پیش‌فرض برای فایل‌ها استفاده می‌شود.</p>
+                </div>
+              </div>
+              <div className="settings-card space-y-3">
                 <div>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="field-label text-xs" dir="rtl">{fa.settings.token}</span>
-                    <span className="micro-label !text-[10px]" dir="ltr">repo · workflow</span>
+                    <span className="field-label text-xs" dir="ltr">{fa.settings.token}</span>
+                    <span className="micro-label !text-[10px]" dir="ltr">GitHub token</span>
                   </div>
                   <label className="terminal-field mt-2 !py-2">
                     <span className="terminal-prefix">TOKEN</span>
@@ -192,7 +230,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   </label>
                 </div>
                 <div>
-                  <span className="field-label text-xs" dir="rtl">نام مخزن</span>
+                  <span className="field-label text-xs" dir="ltr">نام مخزن</span>
                   <label className="terminal-field mt-2 !py-2">
                     <span className="terminal-prefix">REPO</span>
                     <input
@@ -209,12 +247,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </div>
               </div>
 
-              <div className="hud-block !p-3">
+              <div className="settings-card">
                 <div className="flex items-center gap-2 text-xs text-cns-primary">
                   <Zap size={13} />
-                  <span dir="rtl">{fa.settings.autoSetup}</span>
+                  <span dir="ltr">{fa.settings.autoSetup}</span>
                 </div>
-                <div className="helper-copy mt-1 !text-[11px]" dir="rtl">{fa.settings.autoSetupDesc}</div>
+                <div className="helper-copy mt-1 !text-[11px]" dir="ltr">
+                  اگر مخزن آماده ندارید، این گزینه مخزن و workflow را می‌سازد.
+                </div>
                 <button
                   onClick={handleAutoSetup}
                   disabled={isAutoSetup || !token}
@@ -230,7 +270,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               {error && (
                 <div className="summary-strip warning flex items-center gap-2 text-xs text-cns-warning">
                   <AlertCircle size={14} />
-                  <span dir="rtl">{error}</span>
+                  <span dir="ltr">{error}</span>
                 </div>
               )}
 
@@ -241,7 +281,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   className="system-btn w-full justify-center"
                 >
                   <Save size={12} />
-                  <span dir="rtl">{fa.settings.save}</span>
+                  <span dir="ltr">{fa.settings.save}</span>
                 </button>
 
                 {hasSavedConfig && (
@@ -249,20 +289,27 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     onClick={handleClear}
                     className="system-btn w-full justify-center border-cns-warning text-cns-warning hover:bg-cns-warning/10"
                   >
-                    <span dir="rtl">پاک کردن</span>
+                    <span dir="ltr">پاک کردن</span>
                   </button>
                 )}
               </div>
             </section>
 
-            <section className="space-y-3 flex flex-col">
-              <div className="hud-block !p-3 flex-1 flex flex-col">
+            <section className="settings-section">
+              <div className="settings-section-head">
+                <span className="settings-step">۲</span>
+                <div>
+                  <h3>کوکی‌های یوتیوب</h3>
+                  <p>برای جلوگیری از خطای ربات، محتوای cookies.txt را اینجا قرار دهید.</p>
+                </div>
+              </div>
+              <div className="settings-card flex-1 flex flex-col">
                 <div className="flex items-center gap-2 text-xs text-cns-warning">
                   <AlertCircle size={13} />
-                  <span dir="rtl">{fa.settings.cookies}</span>
+                  <span dir="ltr">{fa.settings.cookies}</span>
                 </div>
-                <div className="helper-copy mt-1 !text-[11px]" dir="rtl">{fa.settings.cookiesDesc}</div>
-                <div className="mt-1 text-[10px] text-cns-warning/80" dir="rtl">{fa.settings.bookmarkletWarn}</div>
+                <div className="helper-copy mt-1 !text-[11px]" dir="ltr">{fa.settings.cookiesDesc}</div>
+                <div className="mt-1 text-[10px] text-cns-warning/80" dir="ltr">{fa.settings.bookmarkletWarn}</div>
 
                 <textarea
                   dir="ltr"
@@ -275,17 +322,17 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 />
 
                 <button
-                  onClick={handleSaveCookies}
-                  disabled={!cookies.trim()}
+                  onClick={() => void handleSaveCookies()}
+                  disabled={!canSaveCookies}
                   className="system-btn mt-2 w-full justify-center"
                 >
                   <Save size={12} />
-                  <span dir="rtl">{fa.settings.cookiesSaved}</span>
+                  <span dir="ltr">{fa.settings.cookiesSaved}</span>
                 </button>
               </div>
 
               <a
-                href="https://chrome.google.com/webstore/detail/get-cookiestxt-locally"
+                href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="system-btn w-full justify-center border-cns-highlight text-cns-highlight no-underline py-2 text-xs"
