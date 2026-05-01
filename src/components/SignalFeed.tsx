@@ -22,6 +22,7 @@ import {
   PERSIAN_YOUTUBE_COOKIES_EXPIRED,
 } from '../lib/errors';
 import { logger } from '../lib/logger';
+import { useBodyScrollLock } from '../lib/useBodyScrollLock';
 
 interface ArchiveBundle {
   items: ArchiveItem[];
@@ -243,10 +244,6 @@ interface UnifiedCard {
   sortAt: number;
 }
 
-function resolveDir(value: string | undefined): 'rtl' | 'ltr' {
-  return value && /[\u0600-\u06ff]/.test(value) ? 'rtl' : 'ltr';
-}
-
 function urlSlug(url: string): string {
   try {
     const u = new URL(url);
@@ -255,6 +252,10 @@ function urlSlug(url: string): string {
   } catch {
     return url.slice(0, 48);
   }
+}
+
+function resolveDir(value: string | undefined): 'rtl' | 'ltr' {
+  return value && /[\u0600-\u06ff]/.test(value) ? 'rtl' : 'ltr';
 }
 
 function sourceName(url: string): string {
@@ -605,6 +606,7 @@ function FailureModal({
   onClose: () => void;
   onRemoveFromList: () => void;
 }) {
+  useBodyScrollLock(true);
   const title = pickTitle(job);
   const source = pickChannel(job);
   const reason = toPersianErrorMessageFromLogs(job.logs);
@@ -627,9 +629,9 @@ function FailureModal({
             {thumb ? <img src={thumb} alt="" /> : <FileVideo size={22} />}
           </div>
           <div className="min-w-0">
-            <div className="failure-popup-title" dir={resolveDir(title)}>{title}</div>
-            <div className="failure-popup-source" dir="ltr">{source}</div>
-            <div className="failure-popup-url" dir="ltr">{job.url}</div>
+            <div className="failure-popup-title" dir="auto">{title}</div>
+            <div className="failure-popup-source" dir="auto">{source}</div>
+            <div className="failure-popup-url" dir="auto">{job.url}</div>
           </div>
         </div>
 
@@ -732,18 +734,15 @@ function ResultCard({
 
       <div className="result-card-body">
         <div
-          className={cn(
-            'result-card-title',
-            titleDir === 'rtl' ? 'text-right' : 'text-left'
-          )}
+          className="result-card-title"
           dir={titleDir}
           title={title}
         >
           <bdi>{title}</bdi>
         </div>
 
-        <div className="result-card-meta" dir="ltr">
-          {channel && <span className="meta-channel">{channel}</span>}
+        <div className="result-card-meta" dir="auto">
+          {channel && <span className="meta-channel" dir="auto">{channel}</span>}
           {channel && duration && <span className="meta-sep">·</span>}
           {duration && <span className="meta-duration">{duration}</span>}
           {!channel && !duration && job && (
@@ -766,13 +765,9 @@ function ResultCard({
                 />
               </div>
               {(job.githubLiveStep || latestLog) && (
-                <div
-                  key={job.githubLiveStep || latestLog || 'live'}
-                  className="live-log-line"
-                  dir="rtl"
-                >
+                <div key={job.githubLiveStep || latestLog || 'live'} className="live-log-line" dir="auto">
                   <span>آخرین وضعیت:</span>
-                  <bdi>{readableLog}</bdi>
+                  <bdi dir="auto">{readableLog}</bdi>
                 </div>
               )}
             </div>
@@ -780,9 +775,9 @@ function ResultCard({
 
           {isFailed && job && (
             <div className="fail-block" dir="rtl">
-              <div className="fail-action" dir="ltr">
+              <div className="fail-action" dir="auto">
                 <AlertTriangle size={12} />
-                <span>{toPersianErrorMessageFromLogs(job.logs)}</span>
+                <span dir="auto">{toPersianErrorMessageFromLogs(job.logs)}</span>
               </div>
               <button type="button" className="fail-remove-btn" onClick={() => onRemoveJob(job.id)}>
                 {fa.feed.removeFailedFromList}
@@ -815,14 +810,14 @@ function ResultCard({
               ) : (
                 <Download size={12} />
               )}
-              <span dir="ltr">
+              <span dir="auto">
                 {archiveDownloading === archive.path ? '...در حال دانلود' : 'دانلود'}
               </span>
             </button>
           )}
 
           {isSuccess && !archive && job && (
-            <div className="post-action" dir="ltr">
+            <div className="post-action" dir="auto">
               ...در حال آماده‌سازی فایل
             </div>
           )}

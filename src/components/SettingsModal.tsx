@@ -5,6 +5,7 @@ import { github } from '../lib/github';
 import { cn } from '../lib/utils';
 import { DiagnosticsPanel } from './DiagnosticsPanel';
 import { toPersianErrorMessage } from '../lib/errors';
+import { useBodyScrollLock } from '../lib/useBodyScrollLock';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ export function SettingsModal({ isOpen, onClose, onConfigChanged }: SettingsModa
   const [cookiesUploadState, setCookiesUploadState] = useState<'idle' | 'busy' | 'ok'>('idle');
   const cookiesOkTimerRef = useRef<number | null>(null);
   const hasSavedConfig = !!github.getConfig();
+  useBodyScrollLock(mounted);
 
   useEffect(() => {
     let closeTimer: number | null = null;
@@ -290,9 +292,9 @@ export function SettingsModal({ isOpen, onClose, onConfigChanged }: SettingsModa
               </div>
 
               {error && (
-                <div className="summary-strip warning flex items-center gap-2 text-xs text-cns-warning">
+                <div className="summary-strip warning flex items-center gap-2 text-xs text-cns-warning" dir="auto">
                   <AlertCircle size={14} />
-                  <span dir="ltr">{error}</span>
+                  <span dir="auto">{error}</span>
                 </div>
               )}
 

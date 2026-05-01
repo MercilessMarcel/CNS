@@ -250,7 +250,7 @@ export function InputNode({ onSubmit, disabled, downloadBusy }: InputNodeProps) 
       </div>
 
       {error && (
-        <div className="fetch-error" dir="ltr">
+        <div className="fetch-error" dir="auto">
           <span>خطا:</span> {error}
         </div>
       )}

@@ -168,10 +168,7 @@ function App() {
 
         {initError && (
           <div className="mb-4 p-3 border border-cns-warning/50 bg-cns-warning/10 rounded-sm">
-            <div
-              className="flex items-center gap-2 text-cns-warning text-sm"
-              dir="ltr"
-            >
+            <div className="flex items-center gap-2 text-cns-warning text-sm" dir="auto">
               <AlertCircle size={14} />
               <span>خطای راه‌اندازی: {initError}</span>
             </div>

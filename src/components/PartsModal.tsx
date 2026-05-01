@@ -6,6 +6,7 @@ import { toPersianErrorMessage } from '../lib/errors';
 import { listSplitPartFiles, type SplitPartDownload } from '../lib/splitParts';
 import { fa } from '../lib/i18n';
 import { formatSize } from '../lib/useArchive';
+import { useBodyScrollLock } from '../lib/useBodyScrollLock';
 
 function stripRepoPath(s: string) {
   return s.replace(/^downloads\//i, '').replace(/\\/g, '/');
@@ -26,6 +27,7 @@ export function PartsModal({ item, onClose }: PartsModalProps) {
   const [loading, setLoading] = useState(true);
   const [closing, setClosing] = useState(false);
   const [downloadingPart, setDownloadingPart] = useState<string | null>(null);
+  useBodyScrollLock(true);
 
   const displayTitle = useMemo(() => stripRepoPath(item.name), [item.name]);
 
@@ -42,7 +44,7 @@ export function PartsModal({ item, onClose }: PartsModalProps) {
     if (downloadingPart) return;
     setDownloadingPart(part.path);
     try {
-      const blob = await github.downloadFileAsBlob(part.sha);
+      const blob = await github.downloadFileAsBlob(part.sha, part.path);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -95,7 +97,6 @@ export function PartsModal({ item, onClose }: PartsModalProps) {
           'parts-dialog modal-shell relative w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col',
           closing && 'closing'
         )}
-        dir="ltr"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="parts-dialog-header">
@@ -118,7 +119,7 @@ export function PartsModal({ item, onClose }: PartsModalProps) {
             </div>
             <div className="parts-hero-main">
               <p className="parts-hero-kicker">{fa.parts.fileLabel}</p>
-              <h2 className="parts-hero-title" title={displayTitle}>
+              <h2 className="parts-hero-title" dir="auto" title={displayTitle}>
                 {displayTitle}
               </h2>
             </div>
@@ -163,7 +164,7 @@ export function PartsModal({ item, onClose }: PartsModalProps) {
                       <span className="parts-row-index">
                         <bdi>{String(idx + 1).padStart(2, '0')}</bdi>
                       </span>
-                      <span className="parts-row-name" title={stripRepoPath(part.name)}>
+                      <span className="parts-row-name" dir="auto" title={stripRepoPath(part.name)}>
                         {stripRepoPath(part.name)}
                       </span>
                       <span className="parts-row-size">
