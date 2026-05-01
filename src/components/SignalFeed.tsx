@@ -1,30 +1,138 @@
-import { useEffect, useRef } from 'react';
-import { Terminal, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Download,
+  Trash2,
+  FileVideo,
+  FileAudio,
+  Package,
+  AlertTriangle,
+  Loader2,
+  RefreshCw,
+} from 'lucide-react';
 import { fa } from '../lib/i18n';
-import { DownloadJob, github } from '../lib/github';
+import { CNSError, DownloadJob, github } from '../lib/github';
 import { cn } from '../lib/utils';
+import { ArchiveItem, formatSize } from '../lib/useArchive';
+import { PartsModal } from './PartsModal';
+import {
+  toPersianErrorMessage,
+  toPersianErrorMessageFromLogs,
+  toPersianFailureHelp,
+  youtubeCookieFailureFromLogs,
+  PERSIAN_YOUTUBE_COOKIES_EXPIRED,
+} from '../lib/errors';
+import { logger } from '../lib/logger';
+
+interface ArchiveBundle {
+  items: ArchiveItem[];
+  isLoading: boolean;
+  hasLoadedOnce: boolean;
+  downloading: string | null;
+  deleting: string | null;
+  refresh: () => void;
+  download: (item: ArchiveItem) => void;
+  remove: (item: ArchiveItem) => void;
+}
 
 interface SignalFeedProps {
   jobs: DownloadJob[];
   onUpdate: (jobId: string, updates: Partial<DownloadJob>) => void;
+  onRemoveJob: (jobId: string) => void;
+  archive: ArchiveBundle;
 }
-
-const STATUS_ICONS = {
-  pending: Terminal,
-  running: Loader2,
-  success: CheckCircle,
-  failed: XCircle,
-};
-
-const STATUS_COLORS = {
-  pending: 'text-cns-deep',
-  running: 'text-cns-primary animate-pulse-signal',
-  success: 'text-cns-highlight',
-  failed: 'text-cns-warning',
-};
 
 const MAX_LOGS = 16;
 const HEARTBEAT_INTERVAL_MS = 15000;
+const POLL_INTERVAL_MS = 5000;
+
+function isActiveJobStatus(s: DownloadJob['status']) {
+  return s === 'pending' || s === 'running';
+}
+
+const RUN_MATCH_MAX_DELTA_MS = 15 * 60 * 1000;
+
+function pickWorkflowRunForJob(job: DownloadJob, runs: any[]): any | null {
+  if (job.githubRunId != null) {
+    return runs.find((r: any) => r.id === job.githubRunId) ?? null;
+  }
+  const jobTime = new Date(job.createdAt).getTime();
+  if (!Number.isFinite(jobTime)) return null;
+  const scored = runs
+    .map((run: any) => {
+      const runTime = new Date(run.created_at).getTime();
+      if (!Number.isFinite(runTime)) return null;
+      return { run, delta: Math.abs(runTime - jobTime) };
+    })
+    .filter((x): x is { run: any; delta: number } => x != null && x.delta < RUN_MATCH_MAX_DELTA_MS)
+    .sort((a, b) => {
+      if (a.delta !== b.delta) return a.delta - b.delta;
+      return (b.run.id ?? 0) - (a.run.id ?? 0);
+    });
+  return scored[0]?.run ?? null;
+}
+
+function deriveGithubActionsProgress(
+  liveJobs: any[],
+  matchingRun: any
+): { progress: number; stepName: string | null } {
+  const rs = matchingRun?.status;
+  if (rs === 'queued' || rs === 'waiting' || rs === 'requested' || rs === 'pending') {
+    return { progress: 5, stepName: null };
+  }
+  if (!Array.isArray(liveJobs) || liveJobs.length === 0) {
+    if (rs === 'in_progress') return { progress: 12, stepName: null };
+    return { progress: 8, stepName: null };
+  }
+
+  const primary =
+    liveJobs.find((j: any) => j.status === 'in_progress') ||
+    liveJobs.find((j: any) => j.status === 'queued' || j.status === 'pending') ||
+    liveJobs.find((j: any) => j.status !== 'completed') ||
+    liveJobs[0];
+
+  const steps: any[] = Array.isArray(primary?.steps) ? primary.steps : [];
+  if (steps.length === 0) {
+    const nm = typeof primary?.name === 'string' ? primary.name : null;
+    if (primary?.status === 'completed' && primary?.conclusion === 'success') {
+      return { progress: 98, stepName: nm };
+    }
+    if (primary?.status === 'completed' && primary?.conclusion === 'failure') {
+      return { progress: 0, stepName: nm };
+    }
+    return {
+      progress: primary?.status === 'queued' || primary?.status === 'pending' ? 9 : 18,
+      stepName: nm,
+    };
+  }
+
+  let i = 0;
+  while (i < steps.length && steps[i]?.status === 'completed') {
+    i++;
+  }
+  const total = Math.max(1, steps.length);
+  if (i >= steps.length) {
+    return { progress: 96, stepName: null };
+  }
+  const cur = steps[i];
+  if (cur?.conclusion === 'failure' || cur?.conclusion === 'cancelled') {
+    return { progress: 0, stepName: typeof cur?.name === 'string' ? cur.name : null };
+  }
+  const name =
+    cur?.status === 'in_progress' || cur?.status === 'queued' || cur?.status === 'pending'
+      ? typeof cur?.name === 'string'
+        ? cur.name
+        : null
+      : null;
+
+  let frac = i / total;
+  if (cur?.status === 'in_progress') {
+    frac += 0.52 / total;
+  } else if (cur?.status === 'queued' || cur?.status === 'pending') {
+    frac += 0.14 / total;
+  }
+  const pct = Math.round(Math.min(97, Math.max(3, frac * 100)));
+  return { progress: pct, stepName: name || extractLiveStep(liveJobs) };
+}
 
 function appendLog(logs: string[], message: string) {
   if (logs[logs.length - 1] === message) return logs;
@@ -32,11 +140,14 @@ function appendLog(logs: string[], message: string) {
 }
 
 function extractLiveStep(jobs: any[]): string | null {
-  const activeJob = jobs.find((job) => job.status === 'in_progress') || jobs.find((job) => job.status !== 'completed');
+  const activeJob =
+    jobs.find((job) => job.status === 'in_progress') ||
+    jobs.find((job) => job.status !== 'completed');
   if (!activeJob) return null;
 
-  const activeStep = activeJob.steps?.find((step: any) => step.status === 'in_progress')
-    || activeJob.steps?.find((step: any) => step.status !== 'completed');
+  const activeStep =
+    activeJob.steps?.find((step: any) => step.status === 'in_progress') ||
+    activeJob.steps?.find((step: any) => step.status !== 'completed');
 
   if (activeStep?.name) return activeStep.name;
   if (activeJob.name) return activeJob.name;
@@ -55,227 +166,664 @@ function extractFailedStep(jobs: any[]): string | null {
 function getFailureMessage(stepName: string | null) {
   if (!stepName) return fa.feed.error;
   if (/cookie/i.test(stepName)) {
-    return 'کوکی‌های یوتیوب پیدا نشد. از تنظیمات، cookies.txt جدید را وارد و دوباره ذخیره کنید.';
+    return toPersianErrorMessage('cookies.txt missing');
   }
   if (/download/i.test(stepName)) {
-    return 'یوتیوب دانلود را به دلیل کوکی منقضی یا تأیید بات مسدود کرد. از مرورگری که داخل یوتیوب لاگین است cookies.txt جدید بگیرید و در تنظیمات ذخیره کنید.';
+    return toPersianErrorMessage('youtube download failed');
   }
-  return `خطا در مرحله: ${stepName}`;
+  return toPersianErrorMessage(stepName);
 }
 
-export function SignalFeed({ jobs, onUpdate }: SignalFeedProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const logRefs = useRef<Record<string, HTMLDivElement | null>>({});
+function persianStepLabel(stepName: string | null): string {
+  if (!stepName) return 'دانلود در حال انجام است';
+  const lower = stepName.toLowerCase();
+  if (lower.includes('checkout')) return 'در حال آماده‌سازی مخزن';
+  if (lower.includes('setup python')) return 'در حال آماده‌سازی پایتون';
+  if (lower.includes('setup node')) return 'در حال آماده‌سازی ابزار دانلود';
+  if (lower.includes('install')) return 'در حال نصب ابزارهای دانلود';
+  if (lower.includes('cookies')) return 'در حال بررسی کوکی‌های یوتیوب';
+  if (lower === 'download' || lower.includes('download video')) return 'در حال دانلود ویدیو';
+  if (lower.includes('metadata')) return 'در حال خواندن نام و تصویر ویدیو';
+  if (lower.includes('split')) return 'در حال بخش‌بندی فایل بزرگ';
+  if (lower.includes('commit') || lower.includes('push')) return 'در حال ذخیره فایل در گیت‌هاب';
+  if (lower.includes('cleanup')) return 'در حال پاک‌سازی فایل‌های قدیمی';
+  return `در حال انجام مرحله: ${stepName}`;
+}
+
+function persianLogLine(log: string | undefined): string {
+  const text = log?.replace(/^\[[^\]]+\]\s*/, '') ?? '';
+  if (!text) return 'در حال دریافت وضعیت دانلود';
+  if (/[\u0600-\u06ff]/.test(text)) return text;
+  return persianStepLabel(text);
+}
+
+function computeProgress(job: DownloadJob): number {
+  if (job.status === 'success') return 100;
+  if (job.status === 'failed') return 0;
+  if (typeof job.progress === 'number' && job.progress >= 0) {
+    return Math.min(99, Math.max(2, job.progress));
+  }
+  return job.status === 'pending' ? 4 : 10;
+}
+
+interface UnifiedCard {
+  key: string;
+  job?: DownloadJob;
+  archive?: ArchiveItem;
+  sortAt: number;
+}
+
+function resolveDir(value: string | undefined): 'rtl' | 'ltr' {
+  return value && /[\u0600-\u06ff]/.test(value) ? 'rtl' : 'ltr';
+}
+
+function urlSlug(url: string): string {
+  try {
+    const u = new URL(url);
+    const last = u.pathname.split('/').filter(Boolean).pop() || u.hostname;
+    return last.length > 48 ? `${last.slice(0, 48)}...` : last;
+  } catch {
+    return url.slice(0, 48);
+  }
+}
+
+function sourceName(url: string): string {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    if (host.includes('youtube') || host.includes('youtu.be')) return 'یوتیوب';
+    if (host.includes('instagram')) return 'اینستاگرام';
+    return host;
+  } catch {
+    return 'لینک وارد شده';
+  }
+}
+
+function pickThumb(job?: DownloadJob, archive?: ArchiveItem): string | undefined {
+  return archive?.metadata?.thumbnail || job?.meta?.thumbnail;
+}
+
+function pickTitle(job?: DownloadJob, archive?: ArchiveItem): string {
+  if (!archive && job && !job.meta?.title) {
+    if (job.status === 'pending' || job.status === 'running') {
+      return 'در حال دریافت اطلاعات ویدیو';
+    }
+    if (job.status === 'failed') {
+      return 'دانلود ناموفق شد';
+    }
+    return 'ویدیوی آماده‌سازی شده';
+  }
+
+  return (
+    archive?.metadata?.title ||
+    job?.meta?.title ||
+    (archive ? archive.name : job ? urlSlug(job.url) : 'unknown')
+  );
+}
+
+function pickChannel(job?: DownloadJob, archive?: ArchiveItem): string | undefined {
+  return archive?.metadata?.uploader || job?.meta?.channel || (job ? sourceName(job.url) : undefined);
+}
+
+function pickDuration(job?: DownloadJob, archive?: ArchiveItem): string | undefined {
+  return archive?.metadata?.duration || job?.meta?.duration;
+}
+
+export function SignalFeed({ jobs, onUpdate, onRemoveJob, archive }: SignalFeedProps) {
+  const jobsRef = useRef(jobs);
+  jobsRef.current = jobs;
   const lastStepRef = useRef<Record<string, string>>({});
   const lastHeartbeatRef = useRef<Record<string, number>>({});
-
-  const formatTime = (value: string) =>
-    new Date(value).toLocaleTimeString('fa-IR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  const shownFailuresRef = useRef<Set<string>>(new Set());
+  const [partsModal, setPartsModal] = useState<ArchiveItem | null>(null);
+  const [failedJob, setFailedJob] = useState<DownloadJob | null>(null);
+  const refreshArchive = archive.refresh;
 
   useEffect(() => {
-    const latestActive = jobs.find(job => job.status === 'pending' || job.status === 'running') ?? jobs[0];
-    if (!latestActive) return;
+    const failed = jobs.find((job) => job.status === 'failed' && !shownFailuresRef.current.has(job.id));
+    if (!failed) return;
+    shownFailuresRef.current.add(failed.id);
+    setFailedJob(failed);
+  }, [jobs]);
 
-    requestAnimationFrame(() => {
-      logRefs.current[latestActive.id]?.scrollTo({
-        top: logRefs.current[latestActive.id]?.scrollHeight ?? 0,
-        behavior: 'smooth',
-      });
-      scrollRef.current?.scrollTo({
-        top: 0,
-        behavior: 'smooth',
-      });
-    });
+  useEffect(() => {
+    setFailedJob((cur) => (cur && !jobs.some((j) => j.id === cur.id) ? null : cur));
   }, [jobs]);
 
   useEffect(() => {
     const pollJobs = async () => {
-      const runningJobs = jobs.filter(j => j.status === 'pending' || j.status === 'running');
-
-      if (runningJobs.length === 0) return;
+      const activeIds = jobsRef.current
+        .filter((j) => isActiveJobStatus(j.status))
+        .map((j) => j.id);
+      if (activeIds.length === 0) return;
 
       try {
         const runs = await github.getWorkflowRuns();
 
-        for (const job of runningJobs) {
-          const matchingRun = runs.find((run: any) => {
-            const runTime = new Date(run.created_at).getTime();
-            const jobTime = new Date(job.createdAt).getTime();
-            return Math.abs(runTime - jobTime) < 60000;
-          });
+        for (const jobId of activeIds) {
+          let current = jobsRef.current.find((j) => j.id === jobId);
+          if (!current || !isActiveJobStatus(current.status)) continue;
 
-          if (matchingRun) {
-            const status = matchingRun.status === 'completed'
-              ? (matchingRun.conclusion === 'success' ? 'success' : 'failed')
+          const matchingRun = pickWorkflowRunForJob(current, runs);
+          if (!matchingRun) continue;
+
+          current = jobsRef.current.find((j) => j.id === jobId);
+          if (!current || !isActiveJobStatus(current.status)) continue;
+
+          const status =
+            matchingRun.status === 'completed'
+              ? matchingRun.conclusion === 'success'
+                ? 'success'
+                : 'failed'
               : 'running';
-            let logs = job.logs;
-            let shouldUpdate = false;
 
-            const liveJobs = await github.getWorkflowRunJobs(matchingRun.id).catch(() => []);
+          let logs = current.logs;
+          let shouldUpdate = false;
 
-            if (status === 'running') {
-              const liveStep = extractLiveStep(liveJobs);
-              const now = Date.now();
-              const formatLabel = job.format.toUpperCase();
-              const qualityLabel = job.quality === 'audio' ? 'فقط صدا' : `${job.quality}P`;
+          const liveJobs = await github
+            .getWorkflowRunJobs(matchingRun.id)
+            .catch(() => []);
 
-              if (job.status === 'pending') {
-                logs = appendLog(
-                  logs,
-                  `[${new Date().toLocaleTimeString('fa-IR')}] دانلود ${qualityLabel} (${formatLabel}) آغاز شد`
-                );
-                shouldUpdate = true;
-              }
+          current = jobsRef.current.find((j) => j.id === jobId);
+          if (!current || !isActiveJobStatus(current.status)) continue;
 
-              if (liveStep && lastStepRef.current[job.id] !== liveStep) {
-                logs = appendLog(logs, `[${new Date().toLocaleTimeString('fa-IR')}] ${liveStep}`);
-                lastStepRef.current[job.id] = liveStep;
-                lastHeartbeatRef.current[job.id] = now;
-                shouldUpdate = true;
-              } else if (now - (lastHeartbeatRef.current[job.id] ?? 0) >= HEARTBEAT_INTERVAL_MS) {
-                const heartbeatText = liveStep
-                  ? `در حال اجرا: ${liveStep}`
-                  : 'در حال دانلود...';
-                logs = appendLog(logs, `[${new Date().toLocaleTimeString('fa-IR')}] ${heartbeatText}`);
-                lastHeartbeatRef.current[job.id] = now;
-                shouldUpdate = true;
-              }
-            } else {
-              delete lastStepRef.current[job.id];
-              delete lastHeartbeatRef.current[job.id];
-            }
+          const gh = deriveGithubActionsProgress(liveJobs, matchingRun);
 
-            if (status !== job.status) {
-              if (status === 'success') {
-                logs = appendLog(logs, `[${new Date().toLocaleTimeString('fa-IR')}] ${fa.feed.complete}`);
-              } else if (status === 'failed') {
-                const failedStep = extractFailedStep(liveJobs);
-                logs = appendLog(logs, `[${new Date().toLocaleTimeString('fa-IR')}] ${getFailureMessage(failedStep)}`);
-              }
+          if (status === 'running') {
+            const liveStep = gh.stepName || extractLiveStep(liveJobs);
+            const now = Date.now();
+
+            if (current.status === 'pending') {
+              logs = appendLog(
+                logs,
+                `[${new Date().toLocaleTimeString('fa-IR')}] دانلود آغاز شد`
+              );
               shouldUpdate = true;
             }
 
-            if (shouldUpdate) {
-              onUpdate(job.id, {
-                status,
+            if (liveStep && lastStepRef.current[jobId] !== liveStep) {
+              logs = appendLog(
                 logs,
-                progress: status === 'success' ? 100 : job.progress,
-              });
+                `[${new Date().toLocaleTimeString('fa-IR')}] ${persianStepLabel(liveStep)}`
+              );
+              lastStepRef.current[jobId] = liveStep;
+              lastHeartbeatRef.current[jobId] = now;
+              shouldUpdate = true;
+            } else if (
+              now - (lastHeartbeatRef.current[jobId] ?? 0) >=
+              HEARTBEAT_INTERVAL_MS
+            ) {
+              const heartbeat = liveStep
+                ? persianStepLabel(liveStep)
+                : '...در حال دانلود';
+              logs = appendLog(
+                logs,
+                `[${new Date().toLocaleTimeString('fa-IR')}] ${heartbeat}`
+              );
+              lastHeartbeatRef.current[jobId] = now;
+              shouldUpdate = true;
+            }
+          } else {
+            delete lastStepRef.current[jobId];
+            delete lastHeartbeatRef.current[jobId];
+          }
+
+          if (status !== current.status) {
+            if (status === 'success') {
+              logs = appendLog(
+                logs,
+                `[${new Date().toLocaleTimeString('fa-IR')}] ${fa.feed.complete}`
+              );
+              setTimeout(() => refreshArchive(), 1500);
+            } else if (status === 'failed') {
+              let failureLine = getFailureMessage(extractFailedStep(liveJobs));
+              const failedRunJob = liveJobs.find((j: any) => j.conclusion === 'failure');
+              const ghJobIdRaw = failedRunJob?.id;
+              const ghJobIdNum =
+                typeof ghJobIdRaw === 'number'
+                  ? ghJobIdRaw
+                  : typeof ghJobIdRaw === 'string' && /^\d+$/.test(ghJobIdRaw)
+                    ? parseInt(ghJobIdRaw, 10)
+                    : NaN;
+              if (Number.isFinite(ghJobIdNum)) {
+                const raw = await github.getJobLogsText(ghJobIdNum);
+                current = jobsRef.current.find((j) => j.id === jobId);
+                if (!current || !isActiveJobStatus(current.status)) continue;
+                if (raw && youtubeCookieFailureFromLogs(raw.split(/\r?\n/))) {
+                  failureLine = PERSIAN_YOUTUBE_COOKIES_EXPIRED;
+                }
+              }
+              logs = appendLog(
+                logs,
+                `[${new Date().toLocaleTimeString('fa-IR')}] ${failureLine}`
+              );
+            }
+            shouldUpdate = true;
+          }
+
+          current = jobsRef.current.find((j) => j.id === jobId);
+          if (!current || !isActiveJobStatus(current.status)) continue;
+
+          const patch: Partial<DownloadJob> = {};
+          if (current.githubRunId == null) {
+            patch.githubRunId = matchingRun.id;
+          }
+          if (shouldUpdate) {
+            patch.status = status;
+            patch.logs = logs;
+          }
+          if (status === 'success') {
+            patch.progress = 100;
+            patch.githubLiveStep = undefined;
+          } else if (status === 'failed') {
+            patch.progress = 0;
+            patch.githubLiveStep = undefined;
+          } else {
+            const nextStep = gh.stepName ?? undefined;
+            if (
+              gh.progress !== current.progress ||
+              (current.githubLiveStep ?? undefined) !== nextStep
+            ) {
+              patch.progress = gh.progress;
+              patch.githubLiveStep = nextStep;
             }
           }
+          if (Object.keys(patch).length > 0) {
+            onUpdate(jobId, patch);
+          }
         }
-      } catch {
-        // Silently handle polling errors
+      } catch (err) {
+        logger.warn('[Poll] Workflow status poll failed', {
+          error: err,
+          runningJobIds: activeIds,
+          runningCount: activeIds.length,
+          ...(err instanceof CNSError
+            ? { cnsErrorCode: err.code, cnsRetryable: err.retryable }
+            : {}),
+        });
+        for (const jid of activeIds) {
+          const latest = jobsRef.current.find((j) => j.id === jid);
+          if (!latest || !isActiveJobStatus(latest.status)) continue;
+          onUpdate(jid, {
+            logs: appendLog(latest.logs, `[${new Date().toLocaleTimeString('fa-IR')}] ${toPersianErrorMessage(err)}`),
+            progress: latest.progress,
+          });
+        }
       }
     };
 
-    const interval = setInterval(pollJobs, 5000);
+    const interval = setInterval(pollJobs, POLL_INTERVAL_MS);
     pollJobs();
-
     return () => clearInterval(interval);
-  }, [jobs, onUpdate]);
+  }, [onUpdate, refreshArchive]);
 
-  if (jobs.length === 0) {
+  const cards: UnifiedCard[] = useMemo(() => {
+    const usedArchivePaths = new Set<string>();
+    const result: UnifiedCard[] = [];
+
+    const sortedJobs = [...jobs].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+    const sortedArchive = [...archive.items].sort(
+      (a, b) => (a.committed_at ?? 0) - (b.committed_at ?? 0)
+    );
+
+    for (const job of sortedJobs) {
+      let matchedArchive: ArchiveItem | undefined;
+      if (job.status === 'success') {
+        const jobTime = new Date(job.createdAt).getTime();
+        const candidate = sortedArchive.find(
+          (a) =>
+            !usedArchivePaths.has(a.path) &&
+            (a.committed_at ?? 0) >= jobTime - 5_000 &&
+            (a.committed_at ?? 0) <= jobTime + 30 * 60_000
+        );
+        if (candidate) {
+          usedArchivePaths.add(candidate.path);
+          matchedArchive = candidate;
+        }
+      }
+      result.push({
+        key: `job:${job.id}`,
+        job,
+        archive: matchedArchive,
+        sortAt:
+          matchedArchive?.committed_at ??
+          new Date(job.createdAt).getTime(),
+      });
+    }
+
+    for (const item of archive.items) {
+      if (usedArchivePaths.has(item.path)) continue;
+      result.push({
+        key: `arc:${item.path}`,
+        archive: item,
+        sortAt: item.committed_at ?? 0,
+      });
+    }
+
+    result.sort((a, b) => {
+      const aActive = a.job && (a.job.status === 'pending' || a.job.status === 'running');
+      const bActive = b.job && (b.job.status === 'pending' || b.job.status === 'running');
+      if (aActive && !bActive) return -1;
+      if (bActive && !aActive) return 1;
+      return b.sortAt - a.sortAt;
+    });
+
+    return result;
+  }, [jobs, archive.items]);
+
+  if (cards.length === 0) {
+    if (archive.isLoading && !archive.hasLoadedOnce) {
+      return (
+        <div className="results-empty">
+          <Loader2 size={20} className="animate-spin opacity-70" />
+          <span dir="ltr" className="opacity-70">
+            ...در حال بررسی
+          </span>
+        </div>
+      );
+    }
     return (
-      <div className="empty-tile">
-        <span className="glyph">
-          <Terminal size={20} />
+      <div className="results-empty">
+        <span dir="ltr">لینک یوتیوب را وارد کنید و دکمه دریافت را بزنید</span>
+        <span dir="ltr" className="opacity-50 text-[10px]">
+          برای شروع، لینک را بالا وارد کنید
         </span>
-        <div className="text-sm text-cns-primary" dir="rtl">{fa.feed.waiting}</div>
-        <div className="text-[10px] opacity-60" dir="ltr">SYSTEM_STANDBY</div>
       </div>
     );
   }
 
   return (
-    <div ref={scrollRef} className="h-full max-h-[560px] overflow-y-auto space-y-3 pr-1">
-      {jobs.map((job) => {
-        const StatusIcon = STATUS_ICONS[job.status];
-        const compactUrl = job.url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
-        const displayUrl = compactUrl.length > 42 ? `${compactUrl.slice(0, 42)}...` : compactUrl;
-        const showMeter = job.status === 'pending' || job.status === 'running' || job.status === 'success';
+    <div className="results-list">
+      {cards.map((card) => (
+        <ResultCard
+          key={card.key}
+          card={card}
+          archiveDownloading={archive.downloading}
+          archiveDeleting={archive.deleting}
+          onDownload={archive.download}
+          onDelete={archive.remove}
+          onRemoveJob={onRemoveJob}
+          onShowParts={(item) => setPartsModal(item)}
+        />
+      ))}
 
-        return (
-          <article
-            key={job.id}
-            className={cn(
-              "signal-card",
-              job.status === 'running' && "running",
-              job.status === 'failed' && "failed",
-              job.status === 'success' && "success"
-            )}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 space-y-2">
-                <div className="flex items-center gap-2 text-[10px] text-cns-deep">
-                  <StatusIcon
-                    size={14}
-                    className={cn(
-                      STATUS_COLORS[job.status],
-                      job.status === 'running' && 'animate-spin'
-                    )}
-                  />
-                  <span dir="rtl">{formatTime(job.createdAt)}</span>
-                </div>
-                <div
-                  dir="ltr"
-                  className="truncate text-left font-mono text-[11px] text-cns-highlight"
-                >
-                  {displayUrl}
-                </div>
+      {partsModal && (
+        <PartsModal item={partsModal} onClose={() => setPartsModal(null)} />
+      )}
+
+      {failedJob && (
+        <FailureModal
+          job={failedJob}
+          onClose={() => setFailedJob(null)}
+          onRemoveFromList={() => {
+            onRemoveJob(failedJob.id);
+            setFailedJob(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function FailureModal({
+  job,
+  onClose,
+  onRemoveFromList,
+}: {
+  job: DownloadJob;
+  onClose: () => void;
+  onRemoveFromList: () => void;
+}) {
+  const title = pickTitle(job);
+  const source = pickChannel(job);
+  const reason = toPersianErrorMessageFromLogs(job.logs);
+  const help = toPersianFailureHelp(reason);
+  const thumb = pickThumb(job);
+
+  return (
+    <div className="failure-popup-wrap" onClick={onClose}>
+      <div className="failure-popup" dir="rtl" onClick={(e) => e.stopPropagation()}>
+        <div className="failure-popup-head">
+          <AlertTriangle size={20} />
+          <div>
+            <strong>دانلود ناموفق شد</strong>
+            <span>فایل دانلود نشد. دلیل زیر را بررسی کنید.</span>
+          </div>
+        </div>
+
+        <div className="failure-popup-video">
+          <div className="failure-popup-thumb">
+            {thumb ? <img src={thumb} alt="" /> : <FileVideo size={22} />}
+          </div>
+          <div className="min-w-0">
+            <div className="failure-popup-title" dir={resolveDir(title)}>{title}</div>
+            <div className="failure-popup-source" dir="ltr">{source}</div>
+            <div className="failure-popup-url" dir="ltr">{job.url}</div>
+          </div>
+        </div>
+
+        <div className="failure-popup-reason">
+          <span>دلیل خطا:</span>
+          <p>{reason}</p>
+        </div>
+
+        <div className="failure-popup-help">
+          {help}
+        </div>
+
+        <div className="failure-popup-actions">
+          <button type="button" className="failure-popup-btn failure-popup-btn-remove" onClick={onRemoveFromList}>
+            {fa.feed.removeFailedFromList}
+          </button>
+          <button type="button" className="failure-popup-btn" onClick={onClose}>
+            فهمیدم
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ResultCardProps {
+  card: UnifiedCard;
+  archiveDownloading: string | null;
+  archiveDeleting: string | null;
+  onDownload: (item: ArchiveItem) => void;
+  onDelete: (item: ArchiveItem) => void;
+  onRemoveJob: (jobId: string) => void;
+  onShowParts: (item: ArchiveItem) => void;
+}
+
+function ResultCard({
+  card,
+  archiveDownloading,
+  archiveDeleting,
+  onDownload,
+  onDelete,
+  onRemoveJob,
+  onShowParts,
+}: ResultCardProps) {
+  const { job, archive } = card;
+  const title = pickTitle(job, archive);
+  const channel = pickChannel(job, archive);
+  const duration = pickDuration(job, archive);
+  const thumb = pickThumb(job, archive);
+  const titleDir = resolveDir(title);
+
+  const isLive = job && (job.status === 'pending' || job.status === 'running');
+  const isFailed = job && job.status === 'failed';
+  const isSuccess = !job || job.status === 'success';
+  const isAudio = archive?.type === 'audio' || job?.format === 'mp3';
+  const Icon = isAudio ? FileAudio : FileVideo;
+
+  const latestLog = job ? job.logs[job.logs.length - 1] : undefined;
+  const readableLog = job?.githubLiveStep
+    ? persianStepLabel(job.githubLiveStep)
+    : persianLogLine(latestLog);
+  const progress = job ? computeProgress(job) : 100;
+  const liveStatus =
+    job?.githubLiveStep != null && job.githubLiveStep !== ''
+      ? persianStepLabel(job.githubLiveStep)
+      : job?.status === 'pending'
+        ? 'در صف اجرای گیت‌هاب'
+        : job?.status === 'running'
+          ? 'در حال اجرا در گیت‌هاب'
+          : '';
+
+  const split = archive?.metadata?.split;
+  const partsCount = archive?.partFileCount ?? archive?.metadata?.parts ?? 0;
+  const sizeBytes = archive?.metadata?.original_size || archive?.size || 0;
+
+  return (
+    <article
+      className={cn(
+        'result-card',
+        isLive && 'is-live',
+        isFailed && 'is-failed',
+        isSuccess && 'is-success'
+      )}
+    >
+      <div className="result-card-thumb">
+        {thumb ? (
+          <img
+            src={thumb}
+            alt=""
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        ) : (
+          <div className="result-card-thumb-placeholder">
+            <Icon size={22} />
+          </div>
+        )}
+      </div>
+
+      <div className="result-card-body">
+        <div
+          className={cn(
+            'result-card-title',
+            titleDir === 'rtl' ? 'text-right' : 'text-left'
+          )}
+          dir={titleDir}
+          title={title}
+        >
+          <bdi>{title}</bdi>
+        </div>
+
+        <div className="result-card-meta" dir="ltr">
+          {channel && <span className="meta-channel">{channel}</span>}
+          {channel && duration && <span className="meta-sep">·</span>}
+          {duration && <span className="meta-duration">{duration}</span>}
+          {!channel && !duration && job && (
+            <span className="meta-channel opacity-60">{sourceName(job.url)}</span>
+          )}
+        </div>
+
+        <div className="result-card-action">
+          {isLive && (
+            <div className="live-action">
+              <div className="live-status-row" dir="rtl">
+                <span className="live-status-label">وضعیت:</span>
+                <span className="live-status-value">{liveStatus}</span>
+                <span className="live-progress-text">{progress.toLocaleString('fa-IR')}٪</span>
               </div>
-              <span className={cn(
-                "system-flag whitespace-nowrap",
-                job.status === 'success' && 'border-cns-highlight text-cns-highlight',
-                job.status === 'failed' && 'border-cns-warning text-cns-warning'
-              )} dir="rtl">
-                {fa.status[job.status]}
-              </span>
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-cns-deep">
-              <span className="system-flag" dir="ltr">{job.quality}</span>
-              <span className="system-flag" dir="ltr">{job.format.toUpperCase()}</span>
-            </div>
-
-            {showMeter && (
-              <div className={cn(
-                "capacity-meter mt-3",
-                (job.status === 'pending' || job.status === 'running') && "active",
-                job.status === 'success' && "complete"
-              )}>
-                <div className="fill" />
-              </div>
-            )}
-
-            <div
-              ref={(node) => {
-                logRefs.current[job.id] = node;
-              }}
-              className="log-surface mt-3"
-            >
-              {job.logs.map((log, i) => (
+              <div className="progress-rail" data-progress={progress}>
                 <div
-                  key={i}
-                  className={cn(
-                    "log-entry",
-                    log.includes('ERROR') && 'error',
-                    log.includes('موفق') && 'success'
-                  )}
+                  className="progress-rail-fill"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              {(job.githubLiveStep || latestLog) && (
+                <div
+                  key={job.githubLiveStep || latestLog || 'live'}
+                  className="live-log-line"
+                  dir="rtl"
                 >
-                  {log}
+                  <span>آخرین وضعیت:</span>
+                  <bdi>{readableLog}</bdi>
                 </div>
-              ))}
-              {job.status === 'running' && (
-                <div className="log-entry cursor-blink text-cns-primary" dir="ltr">stream active</div>
               )}
             </div>
-          </article>
-        );
-      })}
-    </div>
+          )}
+
+          {isFailed && job && (
+            <div className="fail-block" dir="rtl">
+              <div className="fail-action" dir="ltr">
+                <AlertTriangle size={12} />
+                <span>{toPersianErrorMessageFromLogs(job.logs)}</span>
+              </div>
+              <button type="button" className="fail-remove-btn" onClick={() => onRemoveJob(job.id)}>
+                {fa.feed.removeFailedFromList}
+              </button>
+            </div>
+          )}
+
+          {isSuccess && archive && split && (
+            <button
+              type="button"
+              onClick={() => onShowParts(archive)}
+              className="card-btn primary"
+            >
+              <Package size={12} />
+              <span dir="ltr">
+                دانلود بخش‌ها ({partsCount.toLocaleString('fa-IR')})
+              </span>
+            </button>
+          )}
+
+          {isSuccess && archive && !split && (
+            <button
+              type="button"
+              onClick={() => onDownload(archive)}
+              disabled={archiveDownloading === archive.path}
+              className="card-btn primary"
+            >
+              {archiveDownloading === archive.path ? (
+                <RefreshCw size={12} className="animate-spin" />
+              ) : (
+                <Download size={12} />
+              )}
+              <span dir="ltr">
+                {archiveDownloading === archive.path ? '...در حال دانلود' : 'دانلود'}
+              </span>
+            </button>
+          )}
+
+          {isSuccess && !archive && job && (
+            <div className="post-action" dir="ltr">
+              ...در حال آماده‌سازی فایل
+            </div>
+          )}
+
+          {archive && (
+            <div className="card-flags" dir="ltr">
+              <span className="card-flag">{formatSize(sizeBytes)}</span>
+              {split && (
+                <span className="card-flag warn" dir="ltr">
+                  <span className="part-count-label" dir="rtl">
+                    <bdi>{partsCount.toLocaleString('fa-IR')}</bdi> بخش
+                  </span>
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {archive && (
+        <button
+          type="button"
+          onClick={() => onDelete(archive)}
+          disabled={archiveDeleting === archive.path}
+          className="card-trash"
+          aria-label="delete"
+          title={fa.archive.delete}
+        >
+          <Trash2 size={12} />
+        </button>
+      )}
+    </article>
   );
 }
