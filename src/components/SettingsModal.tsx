@@ -19,6 +19,7 @@ export function SettingsModal({ isOpen, onClose, onConfigChanged }: SettingsModa
   const [cookies, setCookies] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [setupSuccess, setSetupSuccess] = useState<string | null>(null);
   const [isAutoSetup, setIsAutoSetup] = useState(false);
   const [setupStep, setSetupStep] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'settings' | 'diagnostics'>('settings');
@@ -40,6 +41,7 @@ export function SettingsModal({ isOpen, onClose, onConfigChanged }: SettingsModa
         setRepoName(config.repo);
       }
       setError(null);
+      setSetupSuccess(null);
       if (cookiesOkTimerRef.current != null) {
         window.clearTimeout(cookiesOkTimerRef.current);
         cookiesOkTimerRef.current = null;
@@ -142,15 +144,13 @@ export function SettingsModal({ isOpen, onClose, onConfigChanged }: SettingsModa
 
     setIsAutoSetup(true);
     setError(null);
+    setSetupSuccess(null);
     setSetupStep(fa.settings.creatingRepo);
 
     try {
-      await github.autoSetup(token, 'cns-downloads');
-      setSetupStep(fa.settings.addingWorkflow);
+      const result = await github.autoSetup(token, 'cns-downloads');
+      setSetupSuccess(result.repoCreated ? fa.settings.setupDoneMessage : fa.settings.repoUpdatedMessage);
       onConfigChanged?.();
-      setTimeout(() => {
-        onClose();
-      }, 1500);
     } catch (err) {
       setError(toPersianErrorMessage(err));
     } finally {
@@ -295,6 +295,12 @@ export function SettingsModal({ isOpen, onClose, onConfigChanged }: SettingsModa
                 <div className="summary-strip warning flex items-center gap-2 text-xs text-cns-warning" dir="auto">
                   <AlertCircle size={14} />
                   <span dir="auto">{error}</span>
+                </div>
+              )}
+              {setupSuccess && (
+                <div className="summary-strip flex items-center gap-2 text-xs text-cns-primary" dir="auto">
+                  <Zap size={14} />
+                  <span dir="auto">{setupSuccess}</span>
                 </div>
               )}
 
