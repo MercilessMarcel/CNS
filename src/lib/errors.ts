@@ -14,6 +14,8 @@ export function youtubeCookieFailureFromLogs(logs: string[]): boolean {
   const tail = logs.length > 200 ? logs.slice(-200) : logs;
   const blob = joinLogsForDetection(tail);
   return (
+    blob.includes('cns_cookies_expired') ||
+    blob.includes('cns_cookies_invalid') ||
     blob.includes('cookies are no longer valid') ||
     blob.includes('account cookies are no longer valid') ||
     blob.includes('rotated in the browser') ||
@@ -46,6 +48,8 @@ export function toPersianErrorMessage(error: unknown): string {
   const message = raw.toLowerCase().replace(/[\u2019\u2018]/g, "'");
 
   if (
+    message.includes('cns_cookies_expired') ||
+    message.includes('cns_cookies_invalid') ||
     message.includes('cookie_expired_local') ||
     message.includes('cookie_format_invalid') ||
     message.includes('cookies.txt') ||
