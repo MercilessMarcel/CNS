@@ -59,8 +59,25 @@ const SENSITIVE_KEYS = new Set([
 
 let seq = 0;
 
+function secureRandomSuffix(length = 6): string {
+  const chars = '0123456789abcdefghijklmnopqrstuvwxyz';
+  const bytes = new Uint8Array(length);
+  if (typeof globalThis !== 'undefined' && globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < length; i += 1) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  let out = '';
+  for (let i = 0; i < length; i += 1) {
+    out += chars[bytes[i] % 36];
+  }
+  return out;
+}
+
 function nextId(): string {
-  return `${Date.now().toString(36)}-${(++seq).toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  return `${Date.now().toString(36)}-${(++seq).toString(36)}-${secureRandomSuffix(6)}`;
 }
 
 function inferCategory(message: string): string {
