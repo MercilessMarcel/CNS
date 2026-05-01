@@ -72,11 +72,14 @@ export function SettingsModal({ isOpen, onClose, onConfigChanged }: SettingsModa
     setIsSaving(true);
     setError(null);
     try {
+      const nextRepo = repoName.trim() || 'cns-downloads';
       const config = github.getConfig();
       if (config) {
-        github.setConfig({ token, owner: config.owner, repo: repoName.trim() || config.repo });
+        const next = { token, owner: config.owner, repo: nextRepo };
+        github.setConfig(next);
+        await github.ensureWorkflow(token, next.owner, next.repo);
       } else {
-        const attached = await github.connectExistingRepo(token, repoName.trim() || 'cns-downloads');
+        const attached = await github.connectExistingRepo(token, nextRepo);
         await github.ensureWorkflow(token, attached.owner, attached.repo);
       }
       onConfigChanged?.();
@@ -154,7 +157,7 @@ export function SettingsModal({ isOpen, onClose, onConfigChanged }: SettingsModa
     setSetupStep(fa.settings.creatingRepo);
 
     try {
-      const result = await github.autoSetup(token, 'cns-downloads');
+      const result = await github.autoSetup(token, repoName.trim() || 'cns-downloads');
       setSetupSuccess(result.repoCreated ? fa.settings.setupDoneMessage : fa.settings.repoUpdatedMessage);
       onConfigChanged?.();
     } catch (err) {
