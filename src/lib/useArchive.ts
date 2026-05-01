@@ -246,7 +246,7 @@ export function useArchive({ refreshKey = 0, pollIntervalMs = 30000, enabled = t
       if (downloading) return;
       setDownloading(item.path);
       try {
-        const blob = await github.downloadFileAsBlob(item.sha);
+        const blob = await github.downloadFileAsBlob(item.sha, item.path);
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;

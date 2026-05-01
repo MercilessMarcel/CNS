@@ -404,22 +404,12 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "CNS: Download \$(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-            for attempt in 1 2 3; do
-              git restore cookies.txt 2>/dev/null || git checkout HEAD -- cookies.txt 2>/dev/null || true
-              git pull --rebase --autostash origin main
-              if git push; then
-                echo "Committed and pushed"
-                exit 0
-              fi
-              echo "Push failed, retrying after syncing remote (attempt \$attempt/3)"
-              sleep 5
-            done
-            echo "Push failed after retries"
-            exit 1
+            git push origin HEAD:main
+            echo "Committed and pushed"
           fi
 
       - name: Cleanup old downloads
-        if: always()
+        if: false
         run: |
           # Keep only last 50 files to prevent repo bloat
           cd downloads
@@ -894,25 +884,72 @@ class GitHubClient {
     }
   }
 
-  async downloadFileAsBlob(sha: string): Promise<Blob> {
+  private async downloadBlobWithTimeout(url: string, headers: Record<string, string>, timeoutMs: number): Promise<Response> {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, {
+        headers,
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
+  async downloadFileAsBlob(sha: string, path?: string): Promise<Blob> {
     const config = this.getConfig();
     if (!config) throw new Error('GitHub config not set');
-    const path = `/repos/${config.owner}/${config.repo}/git/blobs/${sha}`;
-    const response = await fetch(`https://api.github.com${path}`, {
-      headers: {
-        Authorization: `token ${config.token}`,
-        Accept: 'application/vnd.github.raw',
-      },
-    });
+    const headers = {
+      Authorization: `token ${config.token}`,
+      Accept: 'application/vnd.github.raw',
+      'User-Agent': 'CNS-YouTube-Downloader',
+    };
+
+    const blobPath = `/repos/${config.owner}/${config.repo}/git/blobs/${sha}`;
+    let response: Response | null = null;
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        response = await this.downloadBlobWithTimeout(`${API_BASE}${blobPath}`, headers, 45000);
+        break;
+      } catch (err) {
+        lastError = err;
+        if (attempt === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+      }
+    }
+    if (!response) {
+      throw new Error(lastError instanceof Error ? lastError.message : 'Download request timed out');
+    }
+
+    if (!response.ok && path) {
+      const contentPath = `/repos/${config.owner}/${config.repo}/contents/${encodeURIComponent(path).replace(/%2F/g, '/')}`;
+      const fallback = await this.downloadBlobWithTimeout(`${API_BASE}${contentPath}`, headers, 45000);
+      if (fallback.ok) {
+        response = fallback;
+      } else {
+        logGithubApiHttpError('[GitHub API] blob download fallback HTTP error', {
+          method: 'GET',
+          path: contentPath,
+          status: fallback.status,
+          requestId: fallback.headers.get('x-github-request-id'),
+          errors: { shaPrefix: sha.slice(0, 8), filePath: path },
+        });
+      }
+    }
+
     if (!response.ok) {
       logGithubApiHttpError('[GitHub API] blob download HTTP error', {
         method: 'GET',
-        path,
+        path: blobPath,
         status: response.status,
         requestId: response.headers.get('x-github-request-id'),
-        errors: { shaPrefix: sha.slice(0, 8) },
+        errors: { shaPrefix: sha.slice(0, 8), filePath: path },
       });
-      throw new Error(`Download failed: ${response.status}`);
+      throw new Error(`Download failed: HTTP ${response.status}`);
     }
     return response.blob();
   }

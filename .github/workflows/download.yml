@@ -296,22 +296,12 @@ jobs:
           echo "No changes to commit"
         else
           git commit -m "CNS: Download $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-          for attempt in 1 2 3; do
-            git restore cookies.txt 2>/dev/null || git checkout HEAD -- cookies.txt 2>/dev/null || true
-            git pull --rebase --autostash origin main
-            if git push; then
-              echo "Committed and pushed"
-              exit 0
-            fi
-            echo "Push failed, retrying after syncing remote (attempt $attempt/3)"
-            sleep 5
-          done
-          echo "Push failed after retries"
-          exit 1
+          git push origin HEAD:main
+          echo "Committed and pushed"
         fi
 
     - name: Cleanup old downloads
-      if: always()
+      if: false
       run: |
         set -e
         # Keep only last 50 files to prevent repo bloat
