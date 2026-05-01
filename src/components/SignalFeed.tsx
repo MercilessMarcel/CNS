@@ -44,7 +44,9 @@ interface SignalFeedProps {
 
 const MAX_LOGS = 16;
 const HEARTBEAT_INTERVAL_MS = 15000;
-const POLL_INTERVAL_MS = 5000;
+const POLL_ACTIVE_MS = 5000;
+const POLL_IDLE_MS = 10000;
+const POLL_BACKOFF_MS = 20000;
 
 function isActiveJobStatus(s: DownloadJob['status']) {
   return s === 'pending' || s === 'running';
@@ -308,6 +310,7 @@ export function SignalFeed({ jobs, onUpdate, onRemoveJob, archive }: SignalFeedP
   const [partsModal, setPartsModal] = useState<ArchiveItem | null>(null);
   const [failedJob, setFailedJob] = useState<DownloadJob | null>(null);
   const refreshArchive = archive.refresh;
+  const failedLogFetchedRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     const failed = jobs.find((job) => job.status === 'failed' && !shownFailuresRef.current.has(job.id));
@@ -321,14 +324,31 @@ export function SignalFeed({ jobs, onUpdate, onRemoveJob, archive }: SignalFeedP
   }, [jobs]);
 
   useEffect(() => {
+    let cancelled = false;
+    let timer: number | null = null;
+    let unchangedPolls = 0;
+
+    const scheduleNext = (ms: number) => {
+      if (cancelled) return;
+      timer = window.setTimeout(pollJobs, ms);
+    };
+
     const pollJobs = async () => {
       const activeIds = jobsRef.current
         .filter((j) => isActiveJobStatus(j.status))
         .map((j) => j.id);
-      if (activeIds.length === 0) return;
+      if (activeIds.length === 0) {
+        unchangedPolls = 0;
+        scheduleNext(POLL_IDLE_MS);
+        return;
+      }
 
       try {
         const runs = await github.getWorkflowRuns();
+        const jobsByRunId = new Map<number, any[]>();
+        const patchCountBefore = activeIds.length;
+        let patchCount = 0;
+        const refreshSet = new Set<string>();
 
         for (const jobId of activeIds) {
           let current = jobsRef.current.find((j) => j.id === jobId);
@@ -350,9 +370,11 @@ export function SignalFeed({ jobs, onUpdate, onRemoveJob, archive }: SignalFeedP
           let logs = current.logs;
           let shouldUpdate = false;
 
-          const liveJobs = await github
-            .getWorkflowRunJobs(matchingRun.id)
-            .catch(() => []);
+          let liveJobs = jobsByRunId.get(matchingRun.id);
+          if (!liveJobs) {
+            liveJobs = await github.getWorkflowRunJobs(matchingRun.id).catch(() => []);
+            jobsByRunId.set(matchingRun.id, liveJobs);
+          }
 
           current = jobsRef.current.find((j) => j.id === jobId);
           if (!current || !isActiveJobStatus(current.status)) continue;
@@ -404,7 +426,7 @@ export function SignalFeed({ jobs, onUpdate, onRemoveJob, archive }: SignalFeedP
                 logs,
                 `[${new Date().toLocaleTimeString('fa-IR')}] ${fa.feed.complete}`
               );
-              setTimeout(() => refreshArchive(), 1500);
+              refreshSet.add(jobId);
             } else if (status === 'failed') {
               let failureLine = getFailureMessage(extractFailedStep(liveJobs));
               const failedRunJob = liveJobs.find((j: any) => j.conclusion === 'failure');
@@ -415,7 +437,8 @@ export function SignalFeed({ jobs, onUpdate, onRemoveJob, archive }: SignalFeedP
                   : typeof ghJobIdRaw === 'string' && /^\d+$/.test(ghJobIdRaw)
                     ? parseInt(ghJobIdRaw, 10)
                     : NaN;
-              if (Number.isFinite(ghJobIdNum)) {
+              if (Number.isFinite(ghJobIdNum) && !failedLogFetchedRef.current.has(ghJobIdNum)) {
+                failedLogFetchedRef.current.add(ghJobIdNum);
                 const raw = await github.getJobLogsText(ghJobIdNum);
                 current = jobsRef.current.find((j) => j.id === jobId);
                 if (!current || !isActiveJobStatus(current.status)) continue;
@@ -460,8 +483,14 @@ export function SignalFeed({ jobs, onUpdate, onRemoveJob, archive }: SignalFeedP
           }
           if (Object.keys(patch).length > 0) {
             onUpdate(jobId, patch);
+            patchCount += 1;
           }
         }
+        refreshSet.forEach(() => window.setTimeout(() => refreshArchive(), 1200));
+        const changed = patchCount > 0 || patchCountBefore === 0;
+        unchangedPolls = changed ? 0 : Math.min(unchangedPolls + 1, 10);
+        const nextMs = unchangedPolls >= 3 ? POLL_BACKOFF_MS : POLL_ACTIVE_MS;
+        scheduleNext(nextMs);
       } catch (err) {
         logger.warn('[Poll] Workflow status poll failed', {
           error: err,
@@ -479,12 +508,16 @@ export function SignalFeed({ jobs, onUpdate, onRemoveJob, archive }: SignalFeedP
             progress: latest.progress,
           });
         }
+        unchangedPolls = Math.min(unchangedPolls + 1, 10);
+        scheduleNext(POLL_BACKOFF_MS);
       }
     };
 
-    const interval = setInterval(pollJobs, POLL_INTERVAL_MS);
     pollJobs();
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      if (timer != null) window.clearTimeout(timer);
+    };
   }, [onUpdate, refreshArchive]);
 
   const cards: UnifiedCard[] = useMemo(() => {
