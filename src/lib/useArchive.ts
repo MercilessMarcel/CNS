@@ -4,6 +4,11 @@ import { toPersianErrorMessage } from './errors';
 import { logger } from './logger';
 import { listSplitPartFiles } from './splitParts';
 
+const GITHUB_API_BASE =
+  typeof window !== 'undefined' && window.location.origin.startsWith('http://localhost:')
+    ? '/github-api'
+    : 'https://api.github.com';
+
 export interface ArchiveItem {
   name: string;
   path: string;
@@ -42,7 +47,7 @@ async function hydrateThumbnail(thumbnail: string | undefined): Promise<string |
   if (!config) return thumbnail;
 
   try {
-    const apiUrl = `https://api.github.com/repos/${config.owner}/${config.repo}/contents/downloads/${encodeURIComponent(thumbPath)}`;
+    const apiUrl = `${GITHUB_API_BASE}/repos/${config.owner}/${config.repo}/contents/downloads/${encodeURIComponent(thumbPath)}`;
     const response = await fetch(apiUrl, {
       headers: {
         Authorization: `token ${config.token}`,

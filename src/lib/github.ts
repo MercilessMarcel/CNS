@@ -1,6 +1,9 @@
 import { logger } from './logger';
 
-const API_BASE = 'https://api.github.com';
+const API_BASE =
+  typeof window !== 'undefined' && window.location.origin.startsWith('http://localhost:')
+    ? '/github-api'
+    : 'https://api.github.com';
 
 function utf8ToBase64GitHub(s: string): string {
   const bytes = new TextEncoder().encode(s);
@@ -1019,7 +1022,7 @@ class GitHubClient {
   }
 
   // Auto-setup: Create repo and workflow file
-  async createRepo(name: string, token: string): Promise<{ owner: string; repo: string }> {
+  async createRepo(name: string, token: string): Promise<{ owner: string; repo: string; created: boolean }> {
     // Create repo using user endpoint
     const response = await fetch(`${API_BASE}/user/repos`, {
       method: 'POST',
@@ -1039,11 +1042,19 @@ class GitHubClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
+      if (response.status === 409 || response.status === 422) {
+        const user = await this.requestWithToken(token, '/user');
+        try {
+          await this.requestWithToken(token, `/repos/${user.login}/${name}`);
+          return { owner: user.login, repo: name, created: false };
+        } catch {
+        }
+      }
       throw new Error(error.message || `Failed to create repo: HTTP ${response.status}`);
     }
 
     const data = await response.json();
-    return { owner: data.owner.login, repo: data.name };
+    return { owner: data.owner.login, repo: data.name, created: true };
   }
 
   async setupWorkflow(token: string, owner: string, repo: string, sha?: string): Promise<void> {
@@ -1075,18 +1086,22 @@ class GitHubClient {
     }
   }
 
-  async autoSetup(token: string, repoName: string = 'cns-downloads'): Promise<GitHubConfig> {
+  async autoSetup(token: string, repoName: string = 'cns-downloads'): Promise<{ config: GitHubConfig; repoCreated: boolean }> {
     // Step 1: Create repo
-    const { owner, repo } = await this.createRepo(repoName, token);
+    const { owner, repo, created } = await this.createRepo(repoName, token);
     
     // Step 2: Setup workflow
-    await this.setupWorkflow(token, owner, repo);
+    if (created) {
+      await this.setupWorkflow(token, owner, repo);
+    } else {
+      await this.ensureWorkflow(token, owner, repo);
+    }
     
     // Step 3: Save config
     const config: GitHubConfig = { token, owner, repo };
     this.setConfig(config);
     
-    return config;
+    return { config, repoCreated: created };
   }
 
   // Cookies management
