@@ -2,6 +2,32 @@ import { logger } from './logger';
 
 const API_BASE = 'https://api.github.com';
 
+function utf8ToBase64GitHub(s: string): string {
+  const bytes = new TextEncoder().encode(s);
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+function logGithubApiHttpError(
+  message: string,
+  detail: {
+    method: string;
+    path: string;
+    status: number;
+    attempt?: number;
+    requestId: string | null;
+    githubMessage?: string;
+    documentationUrl?: string;
+    errors?: unknown;
+  }
+) {
+  logger.warn(message, detail);
+}
+
 // Safe localStorage wrapper with fallback
 const storage = {
   get(key: string): string | null {
@@ -113,6 +139,10 @@ on:
           - mp4
           - webm
           - mp3
+
+concurrency:
+  group: cns-download-queue
+  cancel-in-progress: false
 
 jobs:
   download:
@@ -339,8 +369,14 @@ jobs:
                 # Create split zip (95MB chunks, no password)
                 zip -s 95m "\${base}.zip" -j "\$file"
                 
-                # Count zip parts (including .zip and .z*)
-                part_count=\$(ls -1 "\${base}".zip "\${base}".z* 2>/dev/null | wc -l)
+                shopt -s nullglob
+                n_zip=0
+                [ -f "\${base}.zip" ] && n_zip=1 || true
+                n_z=0
+                for f in "\${base}".z[0-9][0-9]; do
+                  [ -f "\$f" ] && n_z=\$((n_z + 1)) || true
+                done
+                part_count=\$((n_zip + n_z))
                 
                 # Remove original file
                 rm -f "\$file"
@@ -361,14 +397,25 @@ jobs:
           git config user.name "CNS Downloader"
           git config user.email "cns@system.local"
           
-          git add downloads/
+          git restore cookies.txt 2>/dev/null || git checkout HEAD -- cookies.txt 2>/dev/null || true
+          git add -A -- downloads/
           
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
             git commit -m "CNS: Download \$(date -u +'%Y-%m-%d %H:%M:%S UTC')"
-            git push
-            echo "Committed and pushed"
+            for attempt in 1 2 3; do
+              git restore cookies.txt 2>/dev/null || git checkout HEAD -- cookies.txt 2>/dev/null || true
+              git pull --rebase --autostash origin main
+              if git push; then
+                echo "Committed and pushed"
+                exit 0
+              fi
+              echo "Push failed, retrying after syncing remote (attempt \$attempt/3)"
+              sleep 5
+            done
+            echo "Push failed after retries"
+            exit 1
           fi
 
       - name: Cleanup old downloads
@@ -408,6 +455,14 @@ export interface DownloadJob {
   progress: number;
   logs: string[];
   createdAt: string;
+  githubRunId?: number;
+  githubLiveStep?: string;
+  meta?: {
+    title?: string;
+    channel?: string;
+    thumbnail?: string;
+    duration?: string;
+  };
 }
 
 export interface GitHubConfig {
@@ -418,13 +473,19 @@ export interface GitHubConfig {
 
 class GitHubClient {
   private config: GitHubConfig | null = null;
+  private workflowEnsured = false;
 
   setConfig(config: GitHubConfig) {
     if (!isValidConfig(config)) {
-      logger.error('Invalid config object provided to setConfig', { config });
+      logger.error('Invalid config object provided to setConfig', {
+        hasOwner: typeof (config as GitHubConfig)?.owner === 'string',
+        hasRepo: typeof (config as GitHubConfig)?.repo === 'string',
+        hasToken: typeof (config as GitHubConfig)?.token === 'string',
+      });
       return;
     }
     this.config = config;
+    this.workflowEnsured = false;
     storage.set('cns_github_config', JSON.stringify(config));
     logger.info('[GitHub] Config saved', { owner: config.owner, repo: config.repo });
   }
@@ -438,7 +499,11 @@ class GitHubClient {
     const parsed = safeJSONParse<unknown>(stored, null);
 
     if (!isValidConfig(parsed)) {
-      logger.error('[GitHub] Invalid or corrupted config found, clearing', { parsed });
+      logger.error('[GitHub] Invalid or corrupted config found, clearing', {
+        ownerType: typeof (parsed as Record<string, unknown>)?.owner,
+        repoType: typeof (parsed as Record<string, unknown>)?.repo,
+        tokenType: typeof (parsed as Record<string, unknown>)?.token,
+      });
       storage.remove('cns_github_config');
       return null;
     }
@@ -450,8 +515,36 @@ class GitHubClient {
 
   clearConfig() {
     this.config = null;
+    this.workflowEnsured = false;
     storage.remove('cns_github_config');
     logger.info('[GitHub] Config cleared');
+  }
+
+  getSupportSnapshot(): Record<string, unknown> {
+    const c = this.getConfig();
+    let cookiesSlot = false;
+    let cookiesChars = 0;
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('cns_cookies') : null;
+      if (raw) {
+        cookiesSlot = true;
+        cookiesChars = raw.length;
+      }
+    } catch {
+    }
+    return {
+      configLoaded: !!c,
+      owner: c?.owner ?? null,
+      repo: c?.repo ?? null,
+      repositoryFullName: c ? `${c.owner}/${c.repo}` : null,
+      githubTokenConfigured: !!c?.token,
+      githubTokenCharLength: c?.token ? c.token.length : 0,
+      workflowEnsuredCache: this.workflowEnsured,
+      cookiesTextSlotFilled: cookiesSlot,
+      cookiesTextCharCount: cookiesChars,
+      workflowFile: 'download.yml',
+      apiBase: API_BASE,
+    };
   }
 
   private async requestWithToken(token: string, path: string, options: RequestInit = {}, retries: number = 3): Promise<any> {
@@ -470,14 +563,25 @@ class GitHubClient {
         const response = await fetch(url, { ...options, headers });
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          const message = errorData.message || `HTTP ${response.status}`;
+          const errorData = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+          const message = (typeof errorData.message === 'string' && errorData.message) || `HTTP ${response.status}`;
+          logGithubApiHttpError('[GitHub API] HTTP error (token request)', {
+            method: (options.method || 'GET').toUpperCase(),
+            path,
+            status: response.status,
+            attempt: attempt + 1,
+            requestId: response.headers.get('x-github-request-id'),
+            githubMessage: typeof errorData.message === 'string' ? errorData.message : undefined,
+            documentationUrl:
+              typeof errorData.documentation_url === 'string' ? errorData.documentation_url : undefined,
+            errors: errorData.errors,
+          });
 
           if (response.status === 401) {
             throw new CNSError(`Authentication failed: ${message}`, ErrorCodes.AUTH_FAILED, false);
           }
           if (response.status === 403) {
-            const isRateLimit = errorData.message?.includes('rate limit');
+            const isRateLimit = String(errorData.message ?? '').includes('rate limit');
             throw new CNSError(
               isRateLimit ? `Rate limited: ${message}` : `Forbidden: ${message}`,
               isRateLimit ? ErrorCodes.RATE_LIMITED : ErrorCodes.AUTH_FAILED,
@@ -534,19 +638,29 @@ class GitHubClient {
         const response = await fetch(url, { ...options, headers });
         
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          const message = errorData.message || `HTTP ${response.status}`;
-          
-          // Handle specific error codes
+          const errorData = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+          const message = (typeof errorData.message === 'string' && errorData.message) || `HTTP ${response.status}`;
+          logGithubApiHttpError('[GitHub API] HTTP error (config request)', {
+            method: (options.method || 'GET').toUpperCase(),
+            path,
+            status: response.status,
+            attempt: attempt + 1,
+            requestId: response.headers.get('x-github-request-id'),
+            githubMessage: typeof errorData.message === 'string' ? errorData.message : undefined,
+            documentationUrl:
+              typeof errorData.documentation_url === 'string' ? errorData.documentation_url : undefined,
+            errors: errorData.errors,
+          });
+
           if (response.status === 401) {
             throw new CNSError(`Authentication failed: ${message}`, ErrorCodes.AUTH_FAILED, false);
           }
           if (response.status === 403) {
-            const isRateLimit = errorData.message?.includes('rate limit');
+            const isRateLimit = String(errorData.message ?? '').includes('rate limit');
             throw new CNSError(
               isRateLimit ? `Rate limited: ${message}` : `Forbidden: ${message}`,
               isRateLimit ? ErrorCodes.RATE_LIMITED : ErrorCodes.AUTH_FAILED,
-              isRateLimit // Rate limits are retryable
+              isRateLimit
             );
           }
           if (response.status === 404) {
@@ -555,11 +669,10 @@ class GitHubClient {
           if (response.status >= 500) {
             throw new CNSError(`Server error: ${message}`, ErrorCodes.NETWORK_ERROR, true);
           }
-          
+
           throw new CNSError(`Request failed: ${message}`, ErrorCodes.NETWORK_ERROR, attempt < retries - 1);
         }
 
-        // Handle 204 No Content
         if (response.status === 204) {
           return null;
         }
@@ -567,13 +680,11 @@ class GitHubClient {
         return response.json();
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
-        
-        // Don't retry on auth errors or 404s
+
         if (err instanceof CNSError && !err.retryable) {
           throw err;
         }
-        
-        // Wait before retry (exponential backoff)
+
         if (attempt < retries - 1) {
           await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
         }
@@ -591,14 +702,26 @@ class GitHubClient {
     const config = this.getConfig();
     if (!config) throw new CNSError('GitHub config not set', ErrorCodes.CONFIG_MISSING, false);
 
-    // Validate URL format
+    if (!this.workflowEnsured) {
+      await this.ensureWorkflow(config.token, config.owner, config.repo);
+      this.workflowEnsured = true;
+    }
+
+    let targetHost = '';
     try {
-      new URL(url);
+      targetHost = new URL(url).hostname;
     } catch {
       throw new CNSError('Invalid URL format', ErrorCodes.INVALID_URL, false);
     }
 
-    // Workflow dispatch returns 204 No Content on success
+    logger.info('[GitHub] Workflow dispatch requested', {
+      owner: config.owner,
+      repo: config.repo,
+      targetHost,
+      quality,
+      format,
+    });
+
     const url_path = `${API_BASE}/repos/${config.owner}/${config.repo}/actions/workflows/download.yml/dispatches`;
     
     try {
@@ -621,9 +744,19 @@ class GitHubClient {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const message = errorData.message || `HTTP ${response.status}`;
-        
+        const errorData = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+        const message = (typeof errorData.message === 'string' && errorData.message) || `HTTP ${response.status}`;
+        logGithubApiHttpError('[GitHub API] workflow dispatch HTTP error', {
+          method: 'POST',
+          path: `/repos/${config.owner}/${config.repo}/actions/workflows/download.yml/dispatches`,
+          status: response.status,
+          requestId: response.headers.get('x-github-request-id'),
+          githubMessage: typeof errorData.message === 'string' ? errorData.message : undefined,
+          documentationUrl:
+            typeof errorData.documentation_url === 'string' ? errorData.documentation_url : undefined,
+          errors: errorData.errors,
+        });
+
         if (response.status === 401) {
           throw new CNSError(`Invalid GitHub token: ${message}`, ErrorCodes.AUTH_FAILED, false);
         }
@@ -640,8 +773,24 @@ class GitHubClient {
         throw new CNSError(`Workflow trigger failed: ${message}`, ErrorCodes.WORKFLOW_FAILED, false);
       }
 
+      logger.info('[GitHub] Workflow dispatch accepted', {
+        owner: config.owner,
+        repo: config.repo,
+        httpStatus: response.status,
+        targetHost,
+        quality,
+        format,
+      });
       return response.status;
     } catch (err) {
+      logger.error('[GitHub] Workflow dispatch failed', {
+        error: err,
+        owner: config.owner,
+        repo: config.repo,
+        targetHost,
+        quality,
+        format,
+      });
       if (err instanceof CNSError) throw err;
       throw new CNSError(`Network error: ${err instanceof Error ? err.message : 'Unknown error'}`, ErrorCodes.NETWORK_ERROR, true);
     }
@@ -651,10 +800,19 @@ class GitHubClient {
     const config = this.getConfig();
     if (!config) throw new Error('GitHub config not set');
 
-    const data = await this.request(
-      `/repos/${config.owner}/${config.repo}/actions/runs?workflow_id=download.yml&per_page=10`
-    );
-    return data.workflow_runs || [];
+    try {
+      const data = await this.request(
+        `/repos/${config.owner}/${config.repo}/actions/runs?workflow_id=download.yml&per_page=25`
+      );
+      return data.workflow_runs || [];
+    } catch (err) {
+      logger.warn('[GitHub] getWorkflowRuns failed', {
+        error: err,
+        owner: config.owner,
+        repo: config.repo,
+      });
+      throw err;
+    }
   }
 
   async getWorkflowRunJobs(runId: number): Promise<any[]> {
@@ -667,6 +825,39 @@ class GitHubClient {
     return data.jobs || [];
   }
 
+  async getJobLogsText(jobId: number): Promise<string | null> {
+    const config = this.getConfig();
+    if (!config) return null;
+    const url = `${API_BASE}/repos/${config.owner}/${config.repo}/actions/jobs/${jobId}/logs`;
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/vnd.github.v3+json',
+          Authorization: `token ${config.token}`,
+          'User-Agent': 'CNS-YouTube-Downloader',
+        },
+        redirect: 'follow',
+      });
+      if (!response.ok) {
+        logger.warn('[GitHub] getJobLogsText HTTP error', {
+          jobId,
+          status: response.status,
+          path: `/repos/${config.owner}/${config.repo}/actions/jobs/${jobId}/logs`,
+          requestId: response.headers.get('x-github-request-id'),
+        });
+        return null;
+      }
+      const text = await response.text();
+      if (!text || text.length < 4) return null;
+      const cap = 400000;
+      return text.length > cap ? text.slice(-cap) : text;
+    } catch (err) {
+      logger.warn('[GitHub] getJobLogsText failed', { jobId, error: err });
+      return null;
+    }
+  }
+
   async getDownloads(): Promise<any[]> {
     const config = this.getConfig();
     if (!config) throw new Error('GitHub config not set');
@@ -676,7 +867,13 @@ class GitHubClient {
         `/repos/${config.owner}/${config.repo}/contents/downloads`
       );
       return Array.isArray(data) ? data : [];
-    } catch {
+    } catch (err) {
+      logger.warn('[GitHub] downloads listing failed', {
+        error: err,
+        owner: config.owner,
+        repo: config.repo,
+        path: `/repos/${config.owner}/${config.repo}/contents/downloads`,
+      });
       return [];
     }
   }
@@ -700,16 +897,23 @@ class GitHubClient {
   async downloadFileAsBlob(sha: string): Promise<Blob> {
     const config = this.getConfig();
     if (!config) throw new Error('GitHub config not set');
-    const response = await fetch(
-      `https://api.github.com/repos/${config.owner}/${config.repo}/git/blobs/${sha}`,
-      {
-        headers: {
-          Authorization: `token ${config.token}`,
-          Accept: 'application/vnd.github.raw',
-        },
-      }
-    );
-    if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+    const path = `/repos/${config.owner}/${config.repo}/git/blobs/${sha}`;
+    const response = await fetch(`https://api.github.com${path}`, {
+      headers: {
+        Authorization: `token ${config.token}`,
+        Accept: 'application/vnd.github.raw',
+      },
+    });
+    if (!response.ok) {
+      logGithubApiHttpError('[GitHub API] blob download HTTP error', {
+        method: 'GET',
+        path,
+        status: response.status,
+        requestId: response.headers.get('x-github-request-id'),
+        errors: { shaPrefix: sha.slice(0, 8) },
+      });
+      throw new Error(`Download failed: ${response.status}`);
+    }
     return response.blob();
   }
 
@@ -766,7 +970,8 @@ class GitHubClient {
 
   async ensureWorkflow(token: string, owner: string, repo: string): Promise<void> {
     try {
-      await this.requestWithToken(token, `/repos/${owner}/${repo}/contents/.github/workflows/download.yml`);
+      const existing = await this.requestWithToken(token, `/repos/${owner}/${repo}/contents/.github/workflows/download.yml`);
+      await this.setupWorkflow(token, owner, repo, existing?.sha);
     } catch (err) {
       if (err instanceof CNSError && err.code === ErrorCodes.REPO_NOT_FOUND) {
         await this.setupWorkflow(token, owner, repo);
@@ -804,10 +1009,14 @@ class GitHubClient {
     return { owner: data.owner.login, repo: data.name };
   }
 
-  async setupWorkflow(token: string, owner: string, repo: string): Promise<void> {
-    // Commit workflow file to repo
+  async setupWorkflow(token: string, owner: string, repo: string, sha?: string): Promise<void> {
     const path = '.github/workflows/download.yml';
     const content = btoa(WORKFLOW_YML);
+    const body: Record<string, string> = {
+      message: sha ? 'CNS: Update download workflow safety' : 'CNS: Initialize download workflow',
+      content,
+    };
+    if (sha) body.sha = sha;
     
     const response = await fetch(`${API_BASE}/repos/${owner}/${repo}/contents/${path}`, {
       method: 'PUT',
@@ -817,14 +1026,14 @@ class GitHubClient {
         'Content-Type': 'application/json',
         'User-Agent': 'CNS-YouTube-Downloader',
       },
-      body: JSON.stringify({
-        message: 'CNS: Initialize download workflow',
-        content,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
+      if (response.status === 422 && String(error.message || '').toLowerCase().includes('unchanged')) {
+        return;
+      }
       throw new Error(error.message || `Failed to setup workflow: HTTP ${response.status}`);
     }
   }
@@ -857,7 +1066,7 @@ class GitHubClient {
     const config = this.getConfig();
     if (!config) throw new Error('GitHub config not set');
 
-    const content = btoa(cookiesContent);
+    const content = utf8ToBase64GitHub(cookiesContent);
     const path = 'cookies.txt';
     
     // Check if file exists to get SHA
@@ -889,8 +1098,18 @@ class GitHubClient {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.message || `Failed to upload cookies: HTTP ${response.status}`);
+      const error = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+      logGithubApiHttpError('[GitHub API] cookies upload HTTP error', {
+        method: 'PUT',
+        path: `/repos/${config.owner}/${config.repo}/contents/cookies.txt`,
+        status: response.status,
+        requestId: response.headers.get('x-github-request-id'),
+        githubMessage: typeof error.message === 'string' ? error.message : undefined,
+        documentationUrl: typeof error.documentation_url === 'string' ? error.documentation_url : undefined,
+      });
+      throw new Error(
+        (typeof error.message === 'string' && error.message) || `Failed to upload cookies: HTTP ${response.status}`
+      );
     }
   }
 }
