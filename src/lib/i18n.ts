@@ -3,6 +3,7 @@ export const fa = {
     label: 'ورودی فرمان',
     placeholder: 'لینک یوتیوب را وارد کنید',
     hint: 'فقط یک لینک ویدیو در هر بار',
+    waitActiveDownload: 'یک دانلود در حال انجام است؛ بعد از پایان آن دوباره تلاش کنید.',
     paste: 'چسباندن از کلیپ‌بورد',
     pasteFailed: 'خواندن کلیپ‌بورد ممکن نیست (مجوز مرورگر یا HTTPS)',
   },
@@ -46,6 +47,8 @@ export const fa = {
     bookmarkletWarn: 'کوکی‌های یوتیوب بعد از مدتی منقضی می‌شوند و باید دوباره در این بخش وارد شوند.',
     extensionLink: 'Chrome Web Store',
     pasteCookies: 'محتوای فایل cookies.txt را اینجا بچسبانید',
+    uploadCookies: 'آپلود کوکی‌ها به مخزن',
+    uploadingCookies: '...در حال آپلود',
     cookiesSaved: 'کوکی‌ها ذخیره و آپلود شدند',
   },
 } as const;
