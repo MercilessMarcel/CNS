@@ -257,19 +257,37 @@ jobs:
           echo "Quality: $QUALITY"
           echo "Format: $FORMAT"
           
-          # Build quality options - more flexible for Shorts
+          mkdir -p downloads/.tmp
+          export TMPDIR="\${{ github.workspace }}/downloads/.tmp"
+          
           case "$QUALITY" in
             "best")
-              QUALITY_OPT="bestvideo+bestaudio/best"
+              if [ "$FORMAT" = "mp4" ]; then
+                QUALITY_OPT="bestvideo[vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[vcodec^=avc1]+bestaudio/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best"
+              else
+                QUALITY_OPT="bestvideo+bestaudio/best"
+              fi
               ;;
             "1080p")
-              QUALITY_OPT="bestvideo[height<=1080]+bestaudio/best[height<=1080]"
+              if [ "$FORMAT" = "mp4" ]; then
+                QUALITY_OPT="bestvideo[vcodec^=avc1][height<=1080]+bestaudio[ext=m4a]/bestvideo[vcodec^=avc1][height<=1080]+bestaudio/bestvideo[height<=1080][ext=mp4]+bestaudio/bestvideo[height<=1080]+bestaudio/best[height<=1080]"
+              else
+                QUALITY_OPT="bestvideo[height<=1080]+bestaudio/best[height<=1080]"
+              fi
               ;;
             "720p")
-              QUALITY_OPT="bestvideo[height<=720]+bestaudio/best[height<=720]"
+              if [ "$FORMAT" = "mp4" ]; then
+                QUALITY_OPT="bestvideo[vcodec^=avc1][height<=720]+bestaudio[ext=m4a]/bestvideo[vcodec^=avc1][height<=720]+bestaudio/bestvideo[height<=720][ext=mp4]+bestaudio/bestvideo[height<=720]+bestaudio/best[height<=720]"
+              else
+                QUALITY_OPT="bestvideo[height<=720]+bestaudio/best[height<=720]"
+              fi
               ;;
             "480p")
-              QUALITY_OPT="bestvideo[height<=480]+bestaudio/best[height<=480]/worst"
+              if [ "$FORMAT" = "mp4" ]; then
+                QUALITY_OPT="bestvideo[vcodec^=avc1][height<=480]+bestaudio[ext=m4a]/bestvideo[height<=480]+bestaudio/best[height<=480]/worst"
+              else
+                QUALITY_OPT="bestvideo[height<=480]+bestaudio/best[height<=480]/worst"
+              fi
               ;;
             "audio")
               QUALITY_OPT="bestaudio/best"
@@ -294,6 +312,8 @@ jobs:
               --audio-format mp3 \\
               --audio-quality 0 \\
               --output "$OUTPUT_TEMPLATE" \\
+              --windows-filenames \\
+              --trim-filenames 200 \\
               --write-info-json \\
               --write-thumbnail \\
               --convert-thumbnails jpg \\
@@ -302,12 +322,14 @@ jobs:
               --js-runtimes node \\
               "$URL"
           else
-            # Video download - add fallback for Shorts
             OUTPUT_TEMPLATE="downloads/%(title)s.%(ext)s"
             yt-dlp \\
               --format "$QUALITY_OPT" \\
               --merge-output-format "$FORMAT" \\
+              --postprocessor-args "Merger+ffmpeg:-max_muxing_queue_size 99999" \\
               --output "$OUTPUT_TEMPLATE" \\
+              --windows-filenames \\
+              --trim-filenames 200 \\
               --write-info-json \\
               --write-thumbnail \\
               --convert-thumbnails jpg \\
@@ -316,11 +338,13 @@ jobs:
               --retries 3 \\
               --fragment-retries 3 \\
               "$URL" || \\
-            # Fallback: try with worst quality if best fails (Shorts compatibility)
             yt-dlp \\
               --format "worstvideo+worstaudio/worst" \\
               --merge-output-format "$FORMAT" \\
+              --postprocessor-args "Merger+ffmpeg:-max_muxing_queue_size 99999" \\
               --output "$OUTPUT_TEMPLATE" \\
+              --windows-filenames \\
+              --trim-filenames 200 \\
               --write-info-json \\
               --write-thumbnail \\
               --convert-thumbnails jpg \\
