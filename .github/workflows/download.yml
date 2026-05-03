@@ -314,6 +314,10 @@ jobs:
         set -e
         git config user.name "CNS Downloader"
         git config user.email "cns@system.local"
+        git config core.compression 0
+        git config http.postBuffer 2097152000
+        git config feature.manyFiles true
+        git config pack.threads 0
 
         git restore cookies.txt 2>/dev/null || git checkout HEAD -- cookies.txt 2>/dev/null || true
         git add -A -- downloads/
