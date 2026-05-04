@@ -96,6 +96,19 @@ function isValidConfig(obj: unknown): obj is GitHubConfig {
   );
 }
 
+function cookieDomainMatchesRoot(domain: string, root: string): boolean {
+  const d = domain.toLowerCase().replace(/^\./, '');
+  const r = root.toLowerCase();
+  return d === r || d.endsWith(`.${r}`);
+}
+
+function cookieDomainIsYoutubeOrGoogle(domain: string): boolean {
+  return (
+    cookieDomainMatchesRoot(domain, 'youtube.com') ||
+    cookieDomainMatchesRoot(domain, 'google.com')
+  );
+}
+
 // Error types for better handling
 export class CNSError extends Error {
   constructor(
@@ -291,6 +304,10 @@ jobs:
           }
           has_rows = False
           live = False
+          def _cns_cookie_host_suffix(dom, root):
+              d = (dom or '').lower().lstrip('.')
+              r = root.lower()
+              return d == r or d.endswith('.' + r)
           with open('cookies.txt', 'r', encoding='utf-8', errors='replace') as f:
               for raw in f:
                   line = raw.strip()
@@ -306,7 +323,10 @@ jobs:
                       expiry = int(parts[4] or '0')
                   except ValueError:
                       expiry = float('nan')
-                  if 'youtube.com' not in domain and 'google.com' not in domain:
+                  if not (
+                      _cns_cookie_host_suffix(domain, 'youtube.com')
+                      or _cns_cookie_host_suffix(domain, 'google.com')
+                  ):
                       continue
                   if name not in auth:
                       continue
@@ -1767,8 +1787,7 @@ class GitHubClient {
       const domain = (parts[0] || '').toLowerCase();
       const expiry = Number(parts[4] || 0);
       const name = (parts[5] || '').toLowerCase();
-      const isYoutubeDomain = domain.includes('youtube.com') || domain.includes('google.com');
-      if (!isYoutubeDomain) continue;
+      if (!cookieDomainIsYoutubeOrGoogle(domain)) continue;
       if (!authNames.has(name)) continue;
       const live = !Number.isFinite(expiry) || expiry <= 0 || expiry > nowSec;
       if (live) {

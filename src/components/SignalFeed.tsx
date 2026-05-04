@@ -343,11 +343,17 @@ function resolveDir(value: string | undefined): 'rtl' | 'ltr' {
   return value && /[\u0600-\u06ff]/.test(value) ? 'rtl' : 'ltr';
 }
 
+function urlHostnameMatches(hostname: string, root: string): boolean {
+  const h = hostname.toLowerCase();
+  const r = root.toLowerCase();
+  return h === r || h.endsWith(`.${r}`);
+}
+
 function sourceName(url: string): string {
   try {
     const host = new URL(url).hostname.replace(/^www\./, '');
-    if (host.includes('youtube') || host.includes('youtu.be')) return 'یوتیوب';
-    if (host.includes('instagram')) return 'اینستاگرام';
+    if (urlHostnameMatches(host, 'youtube.com') || urlHostnameMatches(host, 'youtu.be')) return 'یوتیوب';
+    if (urlHostnameMatches(host, 'instagram.com')) return 'اینستاگرام';
     return host;
   } catch {
     return 'لینک وارد شده';
