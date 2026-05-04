@@ -72,11 +72,8 @@ function normalizeAdvanced(raw: unknown): DownloadAdvancedOptions {
   const d = DEFAULT_DOWNLOAD_ADVANCED;
   if (!raw || typeof raw !== 'object') return { ...d };
   const o = raw as Record<string, unknown>;
-  const c = o.container;
   const cd = o.codec;
   const br = o.bitrate;
-  const container =
-    c === 'default' || c === 'mp4' || c === 'webm' || c === 'mkv' ? c : d.container;
   const codec = cd === 'copy' || cd === 'h264' || cd === 'vp9' ? cd : d.codec;
   const bitrate =
     br === 'auto' || br === '1M' || br === '3M' || br === '5M' || br === '8M' ? br : d.bitrate;
@@ -84,7 +81,7 @@ function normalizeAdvanced(raw: unknown): DownloadAdvancedOptions {
     typeof o.embedMetadata === 'boolean' ? o.embedMetadata : d.embedMetadata;
   const embedThumbnail =
     typeof o.embedThumbnail === 'boolean' ? o.embedThumbnail : d.embedThumbnail;
-  return { container, codec, bitrate, embedMetadata, embedThumbnail };
+  return { codec, bitrate, embedMetadata, embedThumbnail };
 }
 
 function loadAdvancedFromStorage(): DownloadAdvancedOptions {
@@ -105,7 +102,7 @@ function saveAdvancedToStorage(a: DownloadAdvancedOptions) {
 }
 
 function advancedSubmitKey(a: DownloadAdvancedOptions): string {
-  return `${a.container}|${a.codec}|${a.bitrate}|${a.embedMetadata ? 1 : 0}|${a.embedThumbnail ? 1 : 0}`;
+  return `${a.codec}|${a.bitrate}|${a.embedMetadata ? 1 : 0}|${a.embedThumbnail ? 1 : 0}`;
 }
 
 export function InputNode({ onAddPending, onPatchJob, hasActiveJob, disabled, downloadBusy }: InputNodeProps) {
@@ -141,7 +138,6 @@ export function InputNode({ onAddPending, onPatchJob, hasActiveJob, disabled, do
     if (isMp3) {
       return {
         ...advanced,
-        container: 'default',
         codec: 'copy',
         bitrate: 'auto',
       };
@@ -341,25 +337,6 @@ export function InputNode({ onAddPending, onPatchJob, hasActiveJob, disabled, do
           {advancedOpen && (
             <div className="advanced-popover" dir="rtl" role="dialog" aria-label={fa.input.advancedTitle}>
               <div className="advanced-popover-title">{fa.input.advancedTitle}</div>
-              <div className="advanced-popover-row">
-                <label htmlFor="cns-adv-container">{fa.input.advancedContainer}</label>
-                <select
-                  id="cns-adv-container"
-                  value={advanced.container}
-                  onChange={(e) =>
-                    setAdvanced((a) => ({
-                      ...a,
-                      container: e.target.value as DownloadAdvancedOptions['container'],
-                    }))
-                  }
-                  disabled={videoAdvancedLocked}
-                >
-                  <option value="default">{fa.input.advancedOptDefault}</option>
-                  <option value="mp4">{fa.input.advancedOptMp4}</option>
-                  <option value="webm">{fa.input.advancedOptWebm}</option>
-                  <option value="mkv">{fa.input.advancedOptMkv}</option>
-                </select>
-              </div>
               <div className="advanced-popover-row">
                 <label htmlFor="cns-adv-codec">{fa.input.advancedCodec}</label>
                 <select
