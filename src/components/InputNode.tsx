@@ -346,7 +346,7 @@ export function InputNode({ onAddPending, onPatchJob, hasActiveJob, disabled, do
                 <label htmlFor="cns-adv-container">{fa.input.advancedContainer}</label>
                 <select
                   id="cns-adv-container"
-                  value={advanced.container}
+                  value={dispatchAdvanced.container}
                   onChange={(e) =>
                     setAdvanced((a) => ({
                       ...a,
@@ -365,7 +365,7 @@ export function InputNode({ onAddPending, onPatchJob, hasActiveJob, disabled, do
                 <label htmlFor="cns-adv-codec">{fa.input.advancedCodec}</label>
                 <select
                   id="cns-adv-codec"
-                  value={advanced.codec}
+                  value={dispatchAdvanced.codec}
                   onChange={(e) =>
                     setAdvanced((a) => ({
                       ...a,
@@ -385,14 +385,14 @@ export function InputNode({ onAddPending, onPatchJob, hasActiveJob, disabled, do
                 <label htmlFor="cns-adv-bitrate">{fa.input.advancedBitrate}</label>
                 <select
                   id="cns-adv-bitrate"
-                  value={advanced.bitrate}
+                  value={dispatchAdvanced.bitrate}
                   onChange={(e) =>
                     setAdvanced((a) => ({
                       ...a,
                       bitrate: e.target.value as DownloadAdvancedOptions['bitrate'],
                     }))
                   }
-                  disabled={videoAdvancedLocked || advanced.codec === 'copy'}
+                  disabled={videoAdvancedLocked || dispatchAdvanced.codec === 'copy'}
                 >
                   <option value="auto">{fa.input.advancedOptAutoBr}</option>
                   <option value="1M">1M</option>
