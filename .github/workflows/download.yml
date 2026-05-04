@@ -231,7 +231,9 @@ jobs:
           if [ "$CODEC" != "copy" ]; then
             TARGET=$(ls -t downloads/*.mp4 downloads/*.webm downloads/*.mkv 2>/dev/null | head -1 || true)
             if [ -n "$TARGET" ]; then
-              TMP="${TARGET}.cnsreenc"
+              EXT="${TARGET##*.}"
+              BASE="${TARGET%.*}"
+              TMP="${BASE}.cnsreenc.${EXT}"
               rm -f "$TMP"
               VEXTRA=""
               if [ "$CODEC" = "h264" ]; then
