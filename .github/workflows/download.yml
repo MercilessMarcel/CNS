@@ -76,6 +76,10 @@ on:
         - 'true'
         - 'false'
 
+concurrency:
+  group: cns-download-queue
+  cancel-in-progress: false
+
 jobs:
   download:
     runs-on: ubuntu-latest
@@ -120,6 +124,56 @@ jobs:
           exit 1
         fi
         echo "Cookies file found: $(wc -l < cookies.txt) lines"
+        python3 << 'PYCHK'
+        import math
+        import sys
+        import time
+        now = int(time.time())
+        auth = {
+            'sid', 'hsid', 'ssid', 'apisid', 'sapisid',
+            '__secure-1psid', '__secure-3psid', '__secure-1psidts', '__secure-3psidts',
+            'login_info',
+        }
+        has_rows = False
+        live = False
+        def _cns_cookie_host_suffix(dom, root):
+            d = (dom or '').lower().lstrip('.')
+            r = root.lower()
+            return d == r or d.endswith('.' + r)
+        with open('cookies.txt', 'r', encoding='utf-8', errors='replace') as f:
+            for raw in f:
+                line = raw.strip()
+                if not line or line.startswith('#'):
+                    continue
+                parts = line.split(chr(9))
+                if len(parts) < 7:
+                    continue
+                has_rows = True
+                domain = (parts[0] or '').lower()
+                name = (parts[5] or '').lower()
+                try:
+                    expiry = int(parts[4] or '0')
+                except ValueError:
+                    expiry = float('nan')
+                if not (
+                    _cns_cookie_host_suffix(domain, 'youtube.com')
+                    or _cns_cookie_host_suffix(domain, 'google.com')
+                ):
+                    continue
+                if name not in auth:
+                    continue
+                if math.isnan(expiry) or expiry <= 0 or expiry > now:
+                    live = True
+                    break
+        if not has_rows:
+            print('::error title=CNS cookies invalid::cookies.txt is not a valid Netscape cookies file. Export fresh cookies from your browser (Get cookies.txt) and upload via CNS Settings.')
+            print('ERROR: CNS_COOKIES_INVALID')
+            sys.exit(1)
+        if not live:
+            print('::error title=CNS cookies expired::YouTube/Google auth cookies in cookies.txt look expired. Open CNS Settings, paste fresh cookies.txt from the browser where you are logged into youtube.com, save, then retry.')
+            print('ERROR: CNS_COOKIES_EXPIRED cookies are no longer valid')
+            sys.exit(1)
+        PYCHK
 
     - name: Download video
       id: download
