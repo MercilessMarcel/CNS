@@ -49,6 +49,7 @@ const POLL_ACTIVE_MS = 5000;
 const POLL_IDLE_MS = 10000;
 const POLL_BACKOFF_MS = 20000;
 const JOB_FETCH_CONCURRENCY = 4;
+const SUCCESS_ORPHAN_HIDE_MS = 5 * 60 * 1000;
 
 function isActiveJobStatus(s: DownloadJob['status']) {
   return s === 'pending' || s === 'running';
@@ -329,6 +330,45 @@ interface UnifiedCard {
   sortAt: number;
 }
 
+function normalizeUrlLoose(v: string | undefined): string {
+  if (!v) return '';
+  try {
+    const u = new URL(v);
+    u.hash = '';
+    return u.toString();
+  } catch {
+    return v.trim();
+  }
+}
+
+function findArchiveForJob(job: DownloadJob, items: ArchiveItem[], used: Set<string>): ArchiveItem | undefined {
+  const jobTime = new Date(job.createdAt).getTime();
+  const jobUrl = normalizeUrlLoose(job.url);
+  const byUrl = items.find((a) => {
+    if (used.has(a.path)) return false;
+    const src = normalizeUrlLoose(a.metadata?.original_url);
+    if (!src || !jobUrl) return false;
+    if (src !== jobUrl) return false;
+    const at = a.committed_at ?? 0;
+    return at >= jobTime - 5_000 && at <= jobTime + 30 * 60_000;
+  });
+  if (byUrl) return byUrl;
+
+  const jt = (job.meta?.title || '').trim().toLowerCase();
+  const jc = (job.meta?.channel || '').trim().toLowerCase();
+  if (!jt) return undefined;
+  return items.find((a) => {
+    if (used.has(a.path)) return false;
+    const at = a.committed_at ?? 0;
+    if (!(at >= jobTime - 5_000 && at <= jobTime + 30 * 60_000)) return false;
+    const t = (a.metadata?.title || '').trim().toLowerCase();
+    const c = (a.metadata?.uploader || '').trim().toLowerCase();
+    if (!t || t !== jt) return false;
+    if (jc && c && c !== jc) return false;
+    return true;
+  });
+}
+
 function urlSlug(url: string): string {
   try {
     const u = new URL(url);
@@ -343,11 +383,17 @@ function resolveDir(value: string | undefined): 'rtl' | 'ltr' {
   return value && /[\u0600-\u06ff]/.test(value) ? 'rtl' : 'ltr';
 }
 
+function urlHostnameMatches(hostname: string, root: string): boolean {
+  const h = hostname.toLowerCase();
+  const r = root.toLowerCase();
+  return h === r || h.endsWith(`.${r}`);
+}
+
 function sourceName(url: string): string {
   try {
     const host = new URL(url).hostname.replace(/^www\./, '');
-    if (host.includes('youtube') || host.includes('youtu.be')) return 'یوتیوب';
-    if (host.includes('instagram')) return 'اینستاگرام';
+    if (urlHostnameMatches(host, 'youtube.com') || urlHostnameMatches(host, 'youtu.be')) return 'یوتیوب';
+    if (urlHostnameMatches(host, 'instagram.com')) return 'اینستاگرام';
     return host;
   } catch {
     return 'لینک وارد شده';
@@ -530,7 +576,7 @@ export function SignalFeed({ jobs, onUpdate, onRemoveJob, archive }: SignalFeedP
             ) {
               const heartbeat = liveStep
                 ? persianStepLabel(liveStep)
-                : '...در حال دانلود';
+                : 'درحال دانلود...';
               logs = appendLog(
                 logs,
                 `[${new Date().toLocaleTimeString('fa-IR')}] ${heartbeat}`
@@ -702,17 +748,25 @@ export function SignalFeed({ jobs, onUpdate, onRemoveJob, archive }: SignalFeedP
 
     for (const job of sortedJobs) {
       let matchedArchive: ArchiveItem | undefined;
+      const candidate = findArchiveForJob(job, sortedArchive, usedArchivePaths);
+      if (candidate) {
+        matchedArchive = candidate;
+      }
+      if (job.status === 'pending' || job.status === 'running') {
+        if (matchedArchive) {
+          continue;
+        }
+      }
       if (job.status === 'success') {
-        const jobTime = new Date(job.createdAt).getTime();
-        const candidate = sortedArchive.find(
-          (a) =>
-            !usedArchivePaths.has(a.path) &&
-            (a.committed_at ?? 0) >= jobTime - 5_000 &&
-            (a.committed_at ?? 0) <= jobTime + 30 * 60_000
-        );
-        if (candidate) {
-          usedArchivePaths.add(candidate.path);
-          matchedArchive = candidate;
+        if (matchedArchive) {
+          usedArchivePaths.add(matchedArchive.path);
+        }
+        if (!matchedArchive) {
+          const jobTime = new Date(job.createdAt).getTime();
+          const ageMs = Date.now() - jobTime;
+          if (Number.isFinite(ageMs) && ageMs > SUCCESS_ORPHAN_HIDE_MS) {
+            continue;
+          }
         }
       }
       result.push({
@@ -1019,7 +1073,7 @@ const ResultCard = memo(function ResultCard({
                 <Download size={12} />
               )}
               <span dir="auto">
-                {archiveDownloading === archive.path ? '...در حال دانلود' : 'دانلود'}
+                {archiveDownloading === archive.path ? 'درحال دانلود...' : 'دانلود'}
               </span>
             </button>
           )}

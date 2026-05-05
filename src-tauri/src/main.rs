@@ -53,7 +53,8 @@ fn export_logs_to_file(window: tauri::Window, content: String) -> Result<String,
         Err(install_err) => {
             let app_dir = app
                 .path_resolver()
-                .app_dir()
+                .app_data_dir()
+                .or_else(|| app.path_resolver().app_config_dir())
                 .ok_or_else(|| format!("Install write failed: {}; app data dir unavailable", install_err))?;
             let fallback_file = unique_file_path(app_dir.join("cns-startup-log.json"));
             let path = write_file(fallback_file.clone(), &content)
@@ -86,7 +87,7 @@ fn get_secure_github_token() -> Result<String, String> {
 fn clear_secure_github_token() -> Result<(), String> {
     let entry = keyring::Entry::new("cns", "github_token")
         .map_err(|err| format!("Failed to create keyring entry: {}", err))?;
-    match entry.delete_credential() {
+    match entry.delete_password() {
         Ok(_) => Ok(()),
         Err(_) => Ok(()),
     }
@@ -123,9 +124,9 @@ async fn download_github_file(
         return Err(format!("E_HTTP_{}: download failed", response.status()));
     }
     let resolver = window.app_handle().path_resolver();
-    let mut target = resolver
-        .download_dir()
-        .or_else(|| resolver.app_dir())
+    let mut target = tauri::api::path::download_dir()
+        .or_else(|| resolver.app_data_dir())
+        .or_else(|| resolver.app_config_dir())
         .ok_or_else(|| "E_DIR_RESOLVE: cannot resolve writable directory".to_string())?;
     if let Err(err) = fs::create_dir_all(&target) {
         return Err(format!("E_DIR_CREATE: {}: {}", target.display(), err));

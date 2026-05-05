@@ -1,4 +1,5 @@
 import { logger } from './logger';
+import DOWNLOAD_WORKFLOW_YML from '../../.github/workflows/download.yml?raw';
 
 const API_BASE = 'https://api.github.com';
 const SECURE_TOKEN_PLACEHOLDER = '__cns_secure_token__';
@@ -21,6 +22,10 @@ function utf8ToBase64GitHub(s: string): string {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
   return btoa(binary);
+}
+
+export function encodeRepoContentsPath(path: string): string {
+  return encodeURIComponent(path).replace(/%2F/g, '/');
 }
 
 function logGithubApiHttpError(
@@ -96,6 +101,19 @@ function isValidConfig(obj: unknown): obj is GitHubConfig {
   );
 }
 
+function cookieDomainMatchesRoot(domain: string, root: string): boolean {
+  const d = domain.toLowerCase().replace(/^\./, '');
+  const r = root.toLowerCase();
+  return d === r || d.endsWith(`.${r}`);
+}
+
+function cookieDomainIsYoutubeOrGoogle(domain: string): boolean {
+  return (
+    cookieDomainMatchesRoot(domain, 'youtube.com') ||
+    cookieDomainMatchesRoot(domain, 'google.com')
+  );
+}
+
 // Error types for better handling
 export class CNSError extends Error {
   constructor(
@@ -120,8 +138,35 @@ export const ErrorCodes = {
   CONFIG_MISSING: 'CONFIG_MISSING',
 } as const;
 
+export type DownloadAdvancedContainer = 'default' | 'mp4' | 'webm' | 'mkv';
+export type DownloadAdvancedCodec = 'copy' | 'h264' | 'vp9' | 'hevc' | 'av1';
+export type DownloadAdvancedBitrate = 'auto' | '1M' | '3M' | '5M' | '8M';
+
+export interface DownloadAdvancedOptions {
+  container: DownloadAdvancedContainer;
+  codec: DownloadAdvancedCodec;
+  bitrate: DownloadAdvancedBitrate;
+}
+
+export const DEFAULT_DOWNLOAD_ADVANCED: DownloadAdvancedOptions = {
+  container: 'default',
+  codec: 'copy',
+  bitrate: 'auto',
+};
+
+export function workflowDispatchAdvancedPayload(adv: DownloadAdvancedOptions) {
+  const userTz =
+    typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined;
+  return {
+    container: adv.container,
+    codec: adv.codec,
+    bitrate: adv.bitrate,
+    timezone: typeof userTz === 'string' && userTz.length > 0 ? userTz : 'UTC',
+  };
+}
+
 // Workflow YAML content embedded for auto-setup
-const WORKFLOW_YML = `name: CNS Download Video
+const WORKFLOW_YML_LEGACY = `name: CNS Download Video
 
 on:
   workflow_dispatch:
@@ -150,7 +195,38 @@ on:
           - mp4
           - webm
           - mp3
-
+      container:
+        description: 'Video merge container override'
+        required: true
+        default: 'default'
+        type: choice
+        options:
+          - default
+          - mp4
+          - webm
+          - mkv
+      codec:
+        description: 'Video re-encode after download'
+        required: true
+        default: 'copy'
+        type: choice
+        options:
+          - copy
+          - h264
+          - vp9
+          - hevc
+          - av1
+      bitrate:
+        description: 'Video bitrate when re-encoding'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - 1M
+          - 3M
+          - 5M
+          - 8M
 concurrency:
   group: cns-download-queue
   cancel-in-progress: false
@@ -213,6 +289,10 @@ jobs:
           }
           has_rows = False
           live = False
+          def _cns_cookie_host_suffix(dom, root):
+              d = (dom or '').lower().lstrip('.')
+              r = root.lower()
+              return d == r or d.endswith('.' + r)
           with open('cookies.txt', 'r', encoding='utf-8', errors='replace') as f:
               for raw in f:
                   line = raw.strip()
@@ -228,7 +308,10 @@ jobs:
                       expiry = int(parts[4] or '0')
                   except ValueError:
                       expiry = float('nan')
-                  if 'youtube.com' not in domain and 'google.com' not in domain:
+                  if not (
+                      _cns_cookie_host_suffix(domain, 'youtube.com')
+                      or _cns_cookie_host_suffix(domain, 'google.com')
+                  ):
                       continue
                   if name not in auth:
                       continue
@@ -251,6 +334,9 @@ jobs:
           URL: \${{ github.event.inputs.url }}
           QUALITY: \${{ github.event.inputs.quality }}
           FORMAT: \${{ github.event.inputs.format }}
+          CONTAINER: \${{ github.event.inputs.container }}
+          CODEC: \${{ github.event.inputs.codec }}
+          BITRATE: \${{ github.event.inputs.bitrate }}
         run: |
           echo "Starting download..."
           echo "URL: $URL"
@@ -260,30 +346,42 @@ jobs:
           mkdir -p downloads/.tmp
           export TMPDIR="\${{ github.workspace }}/downloads/.tmp"
           
+          MERGE_FORMAT="$FORMAT"
+          if [ "$CONTAINER" != "default" ] && [ -n "$CONTAINER" ]; then
+            case "$CONTAINER" in
+              mp4|webm|mkv) MERGE_FORMAT="$CONTAINER" ;;
+            esac
+          fi
+          
+          USE_MP4_LADDER=0
+          if [ "$MERGE_FORMAT" = "mp4" ]; then
+            USE_MP4_LADDER=1
+          fi
+          
           case "$QUALITY" in
             "best")
-              if [ "$FORMAT" = "mp4" ]; then
+              if [ "$USE_MP4_LADDER" = "1" ]; then
                 QUALITY_OPT="bestvideo[vcodec^=avc1]+bestaudio[ext=m4a]/bestvideo[vcodec^=avc1]+bestaudio/bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best"
               else
                 QUALITY_OPT="bestvideo+bestaudio/best"
               fi
               ;;
             "1080p")
-              if [ "$FORMAT" = "mp4" ]; then
+              if [ "$USE_MP4_LADDER" = "1" ]; then
                 QUALITY_OPT="bestvideo[vcodec^=avc1][height<=1080]+bestaudio[ext=m4a]/bestvideo[vcodec^=avc1][height<=1080]+bestaudio/bestvideo[height<=1080][ext=mp4]+bestaudio/bestvideo[height<=1080]+bestaudio/best[height<=1080]"
               else
                 QUALITY_OPT="bestvideo[height<=1080]+bestaudio/best[height<=1080]"
               fi
               ;;
             "720p")
-              if [ "$FORMAT" = "mp4" ]; then
+              if [ "$USE_MP4_LADDER" = "1" ]; then
                 QUALITY_OPT="bestvideo[vcodec^=avc1][height<=720]+bestaudio[ext=m4a]/bestvideo[vcodec^=avc1][height<=720]+bestaudio/bestvideo[height<=720][ext=mp4]+bestaudio/bestvideo[height<=720]+bestaudio/best[height<=720]"
               else
                 QUALITY_OPT="bestvideo[height<=720]+bestaudio/best[height<=720]"
               fi
               ;;
             "480p")
-              if [ "$FORMAT" = "mp4" ]; then
+              if [ "$USE_MP4_LADDER" = "1" ]; then
                 QUALITY_OPT="bestvideo[vcodec^=avc1][height<=480]+bestaudio[ext=m4a]/bestvideo[height<=480]+bestaudio/best[height<=480]/worst"
               else
                 QUALITY_OPT="bestvideo[height<=480]+bestaudio/best[height<=480]/worst"
@@ -297,14 +395,25 @@ jobs:
               ;;
           esac
           
-          # Cookies are mandatory - fail if missing
           if [ ! -f "cookies.txt" ]; then
             echo "ERROR: cookies.txt required but not found"
             exit 1
           fi
           
+          EM1="--embed-metadata"
+          EM2="--embed-thumbnail"
+          if [ "$MERGE_FORMAT" = "webm" ]; then
+            EM2=""
+            echo "INFO: skipping embed-thumbnail for webm (yt-dlp/ffmpeg unsupported); keeping JPG sidecar"
+          fi
+          
+          VIDEO_FMTSEL="($QUALITY_OPT)+mergeall[vcodec=none]"
+          if [ "$MERGE_FORMAT" = "webm" ]; then
+            VIDEO_FMTSEL="($QUALITY_OPT)+mergeall[vcodec=none][ext=webm]/$QUALITY_OPT"
+          fi
+          VIDEO_EX="--embed-subs --sub-langs all --audio-multistreams"
+          
           if [ "$FORMAT" = "mp3" ] || [ "$QUALITY" = "audio" ]; then
-            # Audio-only download
             OUTPUT_TEMPLATE="downloads/%(title)s.%(ext)s"
             yt-dlp \\
               --format "$QUALITY_OPT" \\
@@ -317,15 +426,16 @@ jobs:
               --write-info-json \\
               --write-thumbnail \\
               --convert-thumbnails jpg \\
-              --embed-thumbnail \\
+              $EM1 \\
+              $EM2 \\
               --cookies cookies.txt \\
               --js-runtimes node \\
               "$URL"
           else
             OUTPUT_TEMPLATE="downloads/%(title)s.%(ext)s"
             yt-dlp \\
-              --format "$QUALITY_OPT" \\
-              --merge-output-format "$FORMAT" \\
+              --format "$VIDEO_FMTSEL" \\
+              --merge-output-format "$MERGE_FORMAT" \\
               --postprocessor-args "Merger+ffmpeg:-max_muxing_queue_size 99999" \\
               --output "$OUTPUT_TEMPLATE" \\
               --windows-filenames \\
@@ -333,6 +443,9 @@ jobs:
               --write-info-json \\
               --write-thumbnail \\
               --convert-thumbnails jpg \\
+              $EM1 \\
+              $EM2 \\
+              $VIDEO_EX \\
               --cookies cookies.txt \\
               --js-runtimes node \\
               --retries 3 \\
@@ -340,7 +453,7 @@ jobs:
               "$URL" || \\
             yt-dlp \\
               --format "worstvideo+worstaudio/worst" \\
-              --merge-output-format "$FORMAT" \\
+              --merge-output-format "$MERGE_FORMAT" \\
               --postprocessor-args "Merger+ffmpeg:-max_muxing_queue_size 99999" \\
               --output "$OUTPUT_TEMPLATE" \\
               --windows-filenames \\
@@ -348,14 +461,66 @@ jobs:
               --write-info-json \\
               --write-thumbnail \\
               --convert-thumbnails jpg \\
+              $EM1 \\
+              $EM2 \\
+              $VIDEO_EX \\
               --cookies cookies.txt \\
               --js-runtimes node \\
               "$URL"
+            if [ "$CODEC" != "copy" ]; then
+              TARGET=$(ls -t downloads/*.mp4 downloads/*.webm downloads/*.mkv 2>/dev/null | head -1 || true)
+              if [ -n "$TARGET" ]; then
+                EXT="\${TARGET##*.}"
+                BASE="\${TARGET%.*}"
+                TMP="\${BASE}.cnsreenc.\${EXT}"
+                rm -f "$TMP"
+                VEXTRA=""
+                if [ "$CODEC" = "h264" ]; then
+                  case "$BITRATE" in
+                    1M) VEXTRA="-b:v 1M -maxrate 1M -bufsize 2M" ;;
+                    3M) VEXTRA="-b:v 3M -maxrate 3M -bufsize 6M" ;;
+                    5M) VEXTRA="-b:v 5M -maxrate 5M -bufsize 10M" ;;
+                    8M) VEXTRA="-b:v 8M -maxrate 8M -bufsize 16M" ;;
+                    *) VEXTRA="-preset fast -crf 23" ;;
+                  esac
+                  ffmpeg -y -hide_banner -loglevel error -i "$TARGET" -map 0:v:0 -map 0:a -map 0:s? -map 0:v:1? -map_metadata 0 -c:v:0 libx264 $VEXTRA -c:v:1 copy -c:a copy -c:s copy -disposition:v:1 attached_pic "$TMP"
+                elif [ "$CODEC" = "vp9" ]; then
+                  case "$BITRATE" in
+                    1M) VEXTRA="-b:v 1M" ;;
+                    3M) VEXTRA="-b:v 3M" ;;
+                    5M) VEXTRA="-b:v 5M" ;;
+                    8M) VEXTRA="-b:v 8M" ;;
+                    *) VEXTRA="-b:v 0 -crf 32" ;;
+                  esac
+                  ffmpeg -y -hide_banner -loglevel error -i "$TARGET" -map 0:v:0 -map 0:a -map 0:s? -map 0:v:1? -map_metadata 0 -c:v:0 libvpx-vp9 $VEXTRA -c:v:1 copy -c:a copy -c:s copy -disposition:v:1 attached_pic "$TMP"
+                elif [ "$CODEC" = "hevc" ]; then
+                  case "$BITRATE" in
+                    1M) VEXTRA="-b:v 1M -maxrate 1M -bufsize 2M -tag:v:0 hvc1" ;;
+                    3M) VEXTRA="-b:v 3M -maxrate 3M -bufsize 6M -tag:v:0 hvc1" ;;
+                    5M) VEXTRA="-b:v 5M -maxrate 5M -bufsize 10M -tag:v:0 hvc1" ;;
+                    8M) VEXTRA="-b:v 8M -maxrate 8M -bufsize 16M -tag:v:0 hvc1" ;;
+                    *) VEXTRA="-preset medium -crf 28 -tag:v:0 hvc1" ;;
+                  esac
+                  ffmpeg -y -hide_banner -loglevel error -i "$TARGET" -map 0:v:0 -map 0:a -map 0:s? -map 0:v:1? -map_metadata 0 -c:v:0 libx265 $VEXTRA -c:v:1 copy -c:a copy -c:s copy -disposition:v:1 attached_pic "$TMP"
+                elif [ "$CODEC" = "av1" ]; then
+                  case "$BITRATE" in
+                    1M) VEXTRA="-b:v 1M" ;;
+                    3M) VEXTRA="-b:v 3M" ;;
+                    5M) VEXTRA="-b:v 5M" ;;
+                    8M) VEXTRA="-b:v 8M" ;;
+                    *) VEXTRA="-preset 8 -crf 35" ;;
+                  esac
+                  ffmpeg -y -hide_banner -loglevel error -i "$TARGET" -map 0:v:0 -map 0:a -map 0:s? -map 0:v:1? -map_metadata 0 -c:v:0 libsvtav1 $VEXTRA -c:v:1 copy -c:a copy -c:s copy -disposition:v:1 attached_pic "$TMP"
+                fi
+                if [ -f "$TMP" ]; then
+                  mv -f "$TMP" "$TARGET"
+                fi
+              fi
+            fi
           fi
           
           echo "Download complete"
           
-          # Get the downloaded file name
           DOWNLOADED_FILE=$(ls -t downloads/*.mp4 downloads/*.webm downloads/*.mkv downloads/*.mp3 2>/dev/null | head -1 || echo "")
           if [ -n "$DOWNLOADED_FILE" ]; then
             echo "file=$DOWNLOADED_FILE" >> $GITHUB_OUTPUT
@@ -537,12 +702,15 @@ jobs:
             git push || true
           fi
 `;
+void WORKFLOW_YML_LEGACY;
+const WORKFLOW_YML = DOWNLOAD_WORKFLOW_YML;
 
 export interface DownloadJob {
   id: string;
   url: string;
   quality: string;
   format: string;
+  advanced?: DownloadAdvancedOptions;
   status: 'pending' | 'running' | 'success' | 'failed';
   progress: number;
   logs: string[];
@@ -570,6 +738,12 @@ export interface GitHubConfig {
   repo: string;
 }
 
+export type NetworkProbeResult = {
+  ok: boolean;
+  code: 'OK' | 'DNS' | 'TIMEOUT' | 'BLOCKED' | 'NETWORK';
+  message?: string;
+};
+
 type CookieHealth = {
   ok: boolean;
   reason?: string;
@@ -582,6 +756,7 @@ class GitHubClient {
   private inFlightGet = new Map<string, Promise<any>>();
   private hotEndpointCache = new Map<string, { ts: number; data: any }>();
   private hotEndpointRefresh = new Map<string, Promise<any>>();
+  private defaultBranchCache: { key: string; branch: string; ts: number } | null = null;
   private workflowEnsureTs = 0;
   private archiveContentCache = new Map<string, { ts: number; value: { content: string; sha: string } | null }>();
   private archiveContentInFlight = new Map<string, Promise<{ content: string; sha: string } | null>>();
@@ -757,6 +932,7 @@ class GitHubClient {
   clearConfig() {
     this.config = null;
     this.workflowEnsured = false;
+    this.defaultBranchCache = null;
     storage.remove('cns_github_config');
     try {
       sessionStorage.removeItem(SESSION_TOKEN_KEY);
@@ -794,6 +970,38 @@ class GitHubClient {
       workflowFile: 'download.yml',
       apiBase: API_BASE,
     };
+  }
+
+  async probeNetwork(timeoutMs: number = 7000): Promise<NetworkProbeResult> {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const resp = await fetch('https://api.github.com/zen', {
+        method: 'GET',
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      if (resp.ok) return { ok: true, code: 'OK' };
+      if (resp.status === 403 || resp.status === 429) {
+        return { ok: false, code: 'BLOCKED', message: `HTTP ${resp.status}` };
+      }
+      return { ok: false, code: 'NETWORK', message: `HTTP ${resp.status}` };
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return { ok: false, code: 'TIMEOUT', message: 'timeout' };
+      }
+      const m = err instanceof Error ? err.message : String(err);
+      const low = m.toLowerCase();
+      if (low.includes('name') || low.includes('dns') || low.includes('resolve')) {
+        return { ok: false, code: 'DNS', message: m };
+      }
+      if (low.includes('failed to fetch') || low.includes('networkerror')) {
+        return { ok: false, code: 'BLOCKED', message: m };
+      }
+      return { ok: false, code: 'NETWORK', message: m };
+    } finally {
+      window.clearTimeout(timer);
+    }
   }
 
   private async requestWithToken(token: string, path: string, options: RequestInit = {}, retries: number = 3): Promise<any> {
@@ -992,7 +1200,12 @@ class GitHubClient {
     return p;
   }
 
-  async triggerWorkflow(url: string, quality: string, format: string): Promise<number> {
+  async triggerWorkflow(
+    url: string,
+    quality: string,
+    format: string,
+    advanced: DownloadAdvancedOptions = DEFAULT_DOWNLOAD_ADVANCED
+  ): Promise<number> {
     const config = this.getConfig();
     if (!config) throw new CNSError('GitHub config not set', ErrorCodes.CONFIG_MISSING, false);
 
@@ -1015,6 +1228,7 @@ class GitHubClient {
       targetHost,
       quality,
       format,
+      advanced,
     });
 
     const url_path = `${API_BASE}/repos/${config.owner}/${config.repo}/actions/workflows/download.yml/dispatches`;
@@ -1034,6 +1248,7 @@ class GitHubClient {
             url,
             quality,
             format,
+            ...workflowDispatchAdvancedPayload(advanced),
           },
         }),
       });
@@ -1095,9 +1310,10 @@ class GitHubClient {
     url: string,
     quality: string,
     format: string,
+    advanced: DownloadAdvancedOptions,
     timeoutMs: number
   ): Promise<number> {
-    const run = this.triggerWorkflow(url, quality, format);
+    const run = this.triggerWorkflow(url, quality, format, advanced);
     let timer = 0;
     const timeout = new Promise<number>((_, reject) => {
       timer = window.setTimeout(() => reject(new Error('Dispatch timeout')), timeoutMs);
@@ -1112,25 +1328,55 @@ class GitHubClient {
   async triggerWorkflowFast(
     url: string,
     quality: string,
-    format: string
+    format: string,
+    advanced: DownloadAdvancedOptions = DEFAULT_DOWNLOAD_ADVANCED
   ): Promise<{ status: number; dispatchAt: string; runHint: { afterTs: number; quality: string; format: string } }> {
     let lastErr: unknown = null;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const status = await this.triggerWorkflowWithTimeout(url, quality, format, advanced, 12000);
+      const now = Date.now();
+      return {
+        status,
+        dispatchAt: new Date(now).toISOString(),
+        runHint: { afterTs: now - 5000, quality, format },
+      };
+    } catch (err) {
+      lastErr = err;
+    }
+    const timeoutLike =
+      (lastErr instanceof Error && /dispatch timeout/i.test(lastErr.message)) ||
+      (lastErr instanceof CNSError && lastErr.code === ErrorCodes.NETWORK_ERROR);
+    if (timeoutLike) {
+      const now = Date.now();
       try {
-        const status = await this.triggerWorkflowWithTimeout(url, quality, format, 12000);
-        const now = Date.now();
-        return {
-          status,
-          dispatchAt: new Date(now).toISOString(),
-          runHint: { afterTs: now - 5000, quality, format },
-        };
-      } catch (err) {
-        lastErr = err;
-        if (attempt < 2) {
-          const wait = 260 + Math.floor(Math.random() * 440) + attempt * 300;
-          await new Promise((resolve) => setTimeout(resolve, wait));
+        const runs = await this.getWorkflowRuns();
+        const hasFreshRun = runs.some((run: any) => {
+          const rt = new Date(run?.created_at ?? '').getTime();
+          if (!Number.isFinite(rt)) return false;
+          return now - rt <= 90_000;
+        });
+        if (hasFreshRun) {
+          logger.warn('[GitHub] Dispatch uncertain after retries; fresh run detected, continuing as queued', {
+            error: lastErr,
+            quality,
+            format,
+            advanced,
+          });
+          return {
+            status: 0,
+            dispatchAt: new Date(now).toISOString(),
+            runHint: { afterTs: now - 20000, quality, format },
+          };
         }
+      } catch (probeErr) {
+        logger.warn('[GitHub] Dispatch uncertain and run probe failed', {
+          error: probeErr,
+          quality,
+          format,
+          advanced,
+        });
       }
+      throw new CNSError('Dispatch could not be confirmed (network)', ErrorCodes.NETWORK_ERROR, true);
     }
     throw (lastErr instanceof Error ? lastErr : new Error('Workflow dispatch failed'));
   }
@@ -1231,32 +1477,132 @@ class GitHubClient {
     }
   }
 
-  async getDownloads(): Promise<any[]> {
+  private invalidateDownloadsArtifacts(owner: string, repo: string, prefix?: string) {
+    const endpointKey = `downloads:${owner}/${repo}`;
+    this.hotEndpointCache.delete(endpointKey);
+    const pfx = `${owner}/${repo}:`;
+    const purgePath = (pathOnly: string) =>
+      prefix
+        ? pathOnly === prefix || pathOnly.startsWith(`${prefix}/`)
+        : true;
+    for (const k of [...this.archiveContentCache.keys()]) {
+      if (!k.startsWith(pfx)) continue;
+      const pathOnly = k.slice(pfx.length);
+      if (purgePath(pathOnly)) this.archiveContentCache.delete(k);
+    }
+    for (const k of [...this.commitTimeCache.keys()]) {
+      if (!k.startsWith(pfx)) continue;
+      const pathOnly = k.slice(pfx.length);
+      if (purgePath(pathOnly)) this.commitTimeCache.delete(k);
+    }
+  }
+
+  invalidateDownloadsCache(prefix?: string) {
+    const config = this.getConfig();
+    if (!config) return;
+    this.invalidateDownloadsArtifacts(config.owner, config.repo, prefix);
+  }
+
+  private async listDownloadsContentsMerged(owner: string, repo: string, tokenScope: string): Promise<any[]> {
+    const topPath = `/repos/${owner}/${repo}/contents/downloads`;
+    let top: any[] = [];
+    try {
+      const data = await this.requestCoalesced(topPath, tokenScope);
+      top = Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+    const out: any[] = [];
+    for (const e of top) {
+      if (e?.type === 'file') out.push(e);
+    }
+    const dirEntries = top.filter((e) => e?.type === 'dir' && e.name !== '.tmp');
+    const subLists = await Promise.all(
+      dirEntries.map(async (e) => {
+        const subPath = `/repos/${owner}/${repo}/contents/downloads/${encodeURIComponent(e.name)}`;
+        try {
+          const d = await this.requestCoalesced(subPath, tokenScope);
+          return Array.isArray(d) ? d : [];
+        } catch {
+          return [];
+        }
+      })
+    );
+    for (const arr of subLists) {
+      for (const f of arr) {
+        if (f?.type === 'file') out.push(f);
+      }
+    }
+    return out;
+  }
+
+  private async loadDownloadsMerged(endpointKey: string, tokenScope: string): Promise<any[]> {
+    const config = this.getConfig();
+    if (!config) return [];
+    const merged = await this.listDownloadsContentsMerged(config.owner, config.repo, tokenScope);
+    this.setHotCache(endpointKey, merged);
+    return merged;
+  }
+
+  async getDefaultBranch(): Promise<string> {
+    const config = this.getConfig();
+    if (!config) throw new Error('GitHub config not set');
+    const key = `${config.owner}/${config.repo}`;
+    const hit = this.defaultBranchCache;
+    if (hit && hit.key === key && Date.now() - hit.ts < 120_000) {
+      return hit.branch;
+    }
+    const repo = await this.request(`/repos/${config.owner}/${config.repo}`);
+    const b =
+      typeof repo?.default_branch === 'string' && repo.default_branch.length > 0 ? repo.default_branch : 'main';
+    this.defaultBranchCache = { key, branch: b, ts: Date.now() };
+    return b;
+  }
+
+  private async listDirectoryEntriesRecursive(
+    owner: string,
+    repo: string,
+    relPath: string,
+    branch: string
+  ): Promise<Array<{ path: string; type: string; sha?: string }>> {
+    const enc = encodeRepoContentsPath(relPath);
+    const data = await this.request(
+      `/repos/${owner}/${repo}/contents/${enc}?ref=${encodeURIComponent(branch)}`
+    );
+    if (!Array.isArray(data)) return [];
+    const out: Array<{ path: string; type: string; sha?: string }> = [];
+    for (const e of data) {
+      if (e.type === 'file') {
+        out.push({ path: e.path, type: e.type, sha: e.sha });
+      } else if (e.type === 'dir') {
+        const sub = await this.listDirectoryEntriesRecursive(owner, repo, e.path, branch);
+        out.push(...sub);
+      }
+    }
+    return out;
+  }
+
+  async getDownloads(forceRefresh: boolean = false): Promise<any[]> {
     const config = this.getConfig();
     if (!config) throw new Error('GitHub config not set');
     const endpointKey = `downloads:${config.owner}/${config.repo}`;
-    const path = `/repos/${config.owner}/${config.repo}/contents/downloads`;
     const tokenScope = `${config.owner}/${config.repo}`;
+    if (forceRefresh) {
+      this.hotEndpointCache.delete(endpointKey);
+    }
     const cached = this.getHotCache<any[]>(endpointKey, 2500);
     if (cached) {
       if (!this.hotEndpointRefresh.has(endpointKey)) {
-        const refresh = this.requestCoalesced(path, tokenScope)
-          .then((data) => {
-            const list = Array.isArray(data) ? data : [];
-            this.setHotCache(endpointKey, list);
-            return list;
-          })
-          .finally(() => this.hotEndpointRefresh.delete(endpointKey));
+        const refresh = this.loadDownloadsMerged(endpointKey, tokenScope).finally(() =>
+          this.hotEndpointRefresh.delete(endpointKey)
+        );
         this.hotEndpointRefresh.set(endpointKey, refresh);
       }
       return cached;
     }
 
     try {
-      const data = await this.requestCoalesced(path, tokenScope);
-      const list = Array.isArray(data) ? data : [];
-      this.setHotCache(endpointKey, list);
-      return list;
+      return await this.loadDownloadsMerged(endpointKey, tokenScope);
     } catch (err) {
       logger.warn('[GitHub] downloads listing failed', {
         error: err,
@@ -1342,7 +1688,7 @@ class GitHubClient {
     }
 
     if (!response.ok && path) {
-      const contentPath = `/repos/${config.owner}/${config.repo}/contents/${encodeURIComponent(path).replace(/%2F/g, '/')}`;
+      const contentPath = `/repos/${config.owner}/${config.repo}/contents/${encodeRepoContentsPath(path)}`;
       const fallback = await this.downloadBlobWithTimeout(`${API_BASE}${contentPath}`, headers, 45000);
       if (fallback.ok) {
         response = fallback;
@@ -1375,7 +1721,7 @@ class GitHubClient {
     if (!config) return { ok: false, reason: 'GitHub config not set' };
     try {
       const data = await this.request(
-        `/repos/${config.owner}/${config.repo}/contents/${encodeURIComponent(path).replace(/%2F/g, '/')}`
+        `/repos/${config.owner}/${config.repo}/contents/${encodeRepoContentsPath(path)}`
       );
       if (!data || typeof data !== 'object') return { ok: false, reason: 'File metadata unavailable' };
       return { ok: true };
@@ -1409,7 +1755,7 @@ class GitHubClient {
     if (!config) throw new Error('GitHub config not set');
 
     await this.request(
-      `/repos/${config.owner}/${config.repo}/contents/${path}`,
+      `/repos/${config.owner}/${config.repo}/contents/${encodeRepoContentsPath(path)}`,
       {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -1419,6 +1765,68 @@ class GitHubClient {
         }),
       }
     );
+    const segs = path.split('/');
+    const inv =
+      segs.length >= 3 ? `${segs[0]}/${segs[1]}` : path;
+    this.invalidateDownloadsArtifacts(config.owner, config.repo, inv);
+  }
+
+  async deleteDirectorySingleCommit(folderPath: string): Promise<void> {
+    const config = this.getConfig();
+    if (!config) throw new Error('GitHub config not set');
+    const pre = folderPath.replace(/\/+$/, '');
+    if (!pre.startsWith('downloads/') || pre.includes('..')) {
+      throw new CNSError('Invalid downloads path', ErrorCodes.NETWORK_ERROR, false);
+    }
+    const parts = pre.split('/').filter(Boolean);
+    if (parts.length !== 2) {
+      throw new CNSError('Folder delete expects downloads/<one-folder>', ErrorCodes.NETWORK_ERROR, false);
+    }
+    const branch = await this.getDefaultBranch();
+    const entries = await this.listDirectoryEntriesRecursive(config.owner, config.repo, pre, branch);
+    const fileEntries = entries.filter((e) => e.type === 'file' && e.sha);
+    const refData = await this.request(`/repos/${config.owner}/${config.repo}/git/ref/heads/${encodeURIComponent(branch)}`);
+    const commitSha = refData?.object?.sha;
+    if (!commitSha) throw new CNSError('Could not resolve branch ref', ErrorCodes.NETWORK_ERROR, false);
+    const commit = await this.request(`/repos/${config.owner}/${config.repo}/git/commits/${commitSha}`);
+    let workingTree = commit?.tree?.sha;
+    if (!workingTree) throw new CNSError('Could not resolve commit tree', ErrorCodes.NETWORK_ERROR, false);
+    if (fileEntries.length > 0) {
+      const treeDeletes = fileEntries.map((e) => ({
+        path: e.path,
+        mode: '100644' as const,
+        type: 'blob' as const,
+        sha: null as null,
+      }));
+      const batch = 280;
+      for (let i = 0; i < treeDeletes.length; i += batch) {
+        const slice = treeDeletes.slice(i, i + batch);
+        const t = await this.request(`/repos/${config.owner}/${config.repo}/git/trees`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ base_tree: workingTree, tree: slice }),
+        });
+        workingTree = t.sha;
+      }
+    }
+    if (workingTree === commit.tree.sha && fileEntries.length === 0) {
+      return;
+    }
+    const newCommit = await this.request(`/repos/${config.owner}/${config.repo}/git/commits`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: `CNS: Remove ${pre}`,
+        tree: workingTree,
+        parents: [commitSha],
+      }),
+    });
+    await this.request(`/repos/${config.owner}/${config.repo}/git/refs/heads/${encodeURIComponent(branch)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sha: newCommit.sha }),
+    });
+    this.invalidateDownloadsArtifacts(config.owner, config.repo, pre);
   }
 
   async getFileContent(path: string): Promise<{ content: string; sha: string } | null> {
@@ -1434,7 +1842,7 @@ class GitHubClient {
     const load = (async () => {
       try {
         const data = await this.request(
-          `/repos/${config.owner}/${config.repo}/contents/${path}`
+          `/repos/${config.owner}/${config.repo}/contents/${encodeRepoContentsPath(path)}`
         );
         const base64Content = data.content.replace(/\s/g, '');
         const binaryString = atob(base64Content);
@@ -1503,12 +1911,16 @@ class GitHubClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
+      const message = String((error as Record<string, unknown>).message || '');
       if (response.status === 409 || response.status === 422) {
         const user = await this.requestWithToken(token, '/user');
-        try {
-          await this.requestWithToken(token, `/repos/${user.login}/${name}`);
-          return { owner: user.login, repo: name, created: false };
-        } catch {
+        const canBeExistingName = message.toLowerCase().includes('name already exists on this account');
+        if (response.status === 409 || canBeExistingName) {
+          try {
+            await this.requestWithToken(token, `/repos/${user.login}/${name}`);
+            return { owner: user.login, repo: name, created: false };
+          } catch {
+          }
         }
       }
       throw new Error(error.message || `Failed to create repo: HTTP ${response.status}`);
@@ -1597,8 +2009,7 @@ class GitHubClient {
       const domain = (parts[0] || '').toLowerCase();
       const expiry = Number(parts[4] || 0);
       const name = (parts[5] || '').toLowerCase();
-      const isYoutubeDomain = domain.includes('youtube.com') || domain.includes('google.com');
-      if (!isYoutubeDomain) continue;
+      if (!cookieDomainIsYoutubeOrGoogle(domain)) continue;
       if (!authNames.has(name)) continue;
       const live = !Number.isFinite(expiry) || expiry <= 0 || expiry > nowSec;
       if (live) {

@@ -50,6 +50,7 @@ function summarizeJobsForSupport(jobs: DownloadJob[]) {
     status: j.status,
     format: j.format,
     quality: j.quality,
+    advanced: j.advanced ?? null,
     url: j.url,
     githubRunId: j.githubRunId ?? null,
     githubLiveStep: j.githubLiveStep ?? null,
@@ -63,6 +64,7 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [hasConfig, setHasConfig] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
+  const [networkError, setNetworkError] = useState<string | null>(null);
   const jobsRef = useRef(jobs);
   const persistTimerRef = useRef<number | null>(null);
   jobsRef.current = jobs;
@@ -103,6 +105,31 @@ function App() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!hasConfig) {
+      setNetworkError(null);
+      return;
+    }
+    let cancelled = false;
+    const check = async () => {
+      const r = await github.probeNetwork();
+      if (cancelled) return;
+      if (r.ok) {
+        setNetworkError(null);
+        return;
+      }
+      setNetworkError('اتصال برنامه به GitHub قطع است. احتمال فایروال/ DNS (مثل svchost) یا پروکسی نادرست.');
+    };
+    void check();
+    const id = window.setInterval(() => {
+      void check();
+    }, 20000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [hasConfig]);
 
   useEffect(() => {
     if (persistTimerRef.current != null) {
@@ -195,6 +222,15 @@ function App() {
           </div>
         )}
 
+        {networkError && (
+          <div className="mb-4 p-3 border border-cns-warning/50 bg-cns-warning/10 rounded-sm">
+            <div className="flex items-center gap-2 text-cns-warning text-sm" dir="auto">
+              <AlertCircle size={14} />
+              <span>{networkError}</span>
+            </div>
+          </div>
+        )}
+
         {!hasConfig && !initError && (
           <div className="config-banner" dir="ltr">
             <AlertCircle size={14} />
@@ -214,8 +250,9 @@ function App() {
           onAddPending={handleAddPendingJob}
           onPatchJob={handlePatchJob}
           hasActiveJob={downloadBusy}
-          disabled={!hasConfig}
+          disabled={!hasConfig || !!networkError}
           downloadBusy={downloadBusy}
+          archiveItems={archive.items}
         />
 
         <SignalFeed

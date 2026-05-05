@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { github } from './github';
+import { encodeRepoContentsPath, github } from './github';
 import { toPersianErrorMessage } from './errors';
 import { logger } from './logger';
 import { listSplitPartFiles } from './splitParts';
@@ -19,6 +19,7 @@ export interface ArchiveItem {
     uploader?: string;
     downloaded_at?: string;
     upload_date?: string;
+    original_url?: string;
     thumbnail?: string;
     split?: boolean;
     zip?: boolean;
@@ -44,7 +45,8 @@ async function hydrateThumbnail(thumbnail: string | undefined): Promise<string |
   if (!config) return thumbnail;
 
   try {
-    const apiUrl = `${GITHUB_API_BASE}/repos/${config.owner}/${config.repo}/contents/downloads/${encodeURIComponent(thumbPath)}`;
+    const rel = thumbPath.startsWith('downloads/') ? thumbPath : `downloads/${thumbPath}`;
+    const apiUrl = `${GITHUB_API_BASE}/repos/${config.owner}/${config.repo}/contents/${encodeRepoContentsPath(rel)}`;
     const response = await fetch(apiUrl, {
       headers: {
         Authorization: `token ${config.token}`,
@@ -327,35 +329,44 @@ export function useArchive({ refreshKey = 0, pollIntervalMs = 30000, enabled = t
   const remove = useCallback(async (item: ArchiveItem) => {
     setDeleting(item.path);
     try {
-      await github.deleteFile(item.path, item.sha);
+      const nested = /^downloads\/[^/]+\/.+$/.test(item.path);
+      if (nested) {
+        const folder = item.path.slice(0, item.path.indexOf('/', 'downloads/'.length));
+        await github.deleteDirectorySingleCommit(folder);
+        setItems((prev) => prev.filter((i) => i.path !== item.path && !i.path.startsWith(`${folder}/`)));
+        github.invalidateDownloadsCache(folder);
+      } else {
+        await github.deleteFile(item.path, item.sha);
 
-      if (item.metadata?.split) {
-        const downloads = await github.getDownloads();
-        for (const part of listSplitPartFiles(item.path, downloads)) {
-          try {
-            await github.deleteFile(part.path, part.sha);
-          } catch {
+        if (item.metadata?.split) {
+          const downloads = await github.getDownloads();
+          for (const part of listSplitPartFiles(item.path, downloads)) {
+            try {
+              await github.deleteFile(part.path, part.sha);
+            } catch {
+            }
           }
         }
-      }
 
-      const metaPath = item.path.replace(/\.[^/.]+$/, '.json');
-      try {
-        const metaContent = await github.getFileContent(metaPath);
-        if (metaContent) {
-          await github.deleteFile(metaPath, metaContent.sha);
+        const metaPath = item.path.replace(/\.[^/.]+$/, '.json');
+        try {
+          const metaContent = await github.getFileContent(metaPath);
+          if (metaContent) {
+            await github.deleteFile(metaPath, metaContent.sha);
+          }
+        } catch {
         }
-      } catch {
-      }
 
-      setItems((prev) => prev.filter((i) => i.path !== item.path));
+        setItems((prev) => prev.filter((i) => i.path !== item.path));
+      }
+      await loadItems();
     } catch (err) {
       logger.error('[Archive] remove failed', { error: err, path: item.path });
       window.alert(toPersianErrorMessage(err));
     } finally {
       setDeleting(null);
     }
-  }, []);
+  }, [loadItems]);
 
   const download = useCallback(
     async (item: ArchiveItem) => {
