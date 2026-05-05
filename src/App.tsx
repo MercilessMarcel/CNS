@@ -115,7 +115,7 @@ function App() {
     const check = async () => {
       const r = await github.probeNetwork();
       if (cancelled) return;
-      if (r.ok) {
+      if (r.ok || r.code === 'AUTH') {
         setNetworkError(null);
         return;
       }

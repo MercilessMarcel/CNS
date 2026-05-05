@@ -253,7 +253,11 @@ export function InputNode({ onAddPending, onPatchJob, hasActiveJob, disabled, do
     }
     const net = await github.probeNetwork();
     if (!net.ok) {
-      setError('اتصال شبکه به GitHub برقرار نیست. فایروال/ DNS یا پروکسی سیستم را بررسی کنید.');
+      if (net.code === 'AUTH') {
+        setError('توکن گیت‌هاب رد شد (۴۰۱). در تنظیمات دوباره ذخیره کنید.');
+      } else {
+        setError('اتصال شبکه به GitHub برقرار نیست. فایروال/ DNS یا پروکسی سیستم را بررسی کنید.');
+      }
       return;
     }
 
