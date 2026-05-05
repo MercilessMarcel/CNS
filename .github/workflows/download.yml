@@ -426,37 +426,32 @@ jobs:
 
     - name: Split large files
       run: |
-        # Split files >100MB into zip chunks
-        MAX_SIZE=$((100 * 1024 * 1024))  # 100MB
-        CHUNK_SIZE=$((90 * 1024 * 1024))  # 90MB
+        LIMIT=$((95 * 1024 * 1024))
 
         while IFS= read -r file; do
           [ -n "$file" ] || continue
           [ -f "$file" ] || continue
           size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null || echo 0)
-          if [ "$size" -gt "$MAX_SIZE" ]; then
-            echo "Splitting and zipping large file: $file ($(numfmt --to=iec-i --suffix=B $size 2>/dev/null || echo $size bytes))"
+          if [ "$size" -gt "$LIMIT" ]; then
+            echo "Zipping/splitting: $file ($(numfmt --to=iec-i --suffix=B $size 2>/dev/null || echo $size bytes))"
             dir=$(dirname "$file")
             basefull=$(basename "$file")
             base="${basefull%.*}"
             ext="${basefull##*.}"
             (
               cd "$dir" || exit 0
-              split -b "$CHUNK_SIZE" -d -a 2 "$basefull" "${base}part"
-              part_num=1
-              for part in "${base}part"*; do
-                if [ -f "$part" ]; then
-                  zip -q "${base}part$(printf '%02d' $part_num).zip" "$part"
-                  rm -f "$part"
-                  part_num=$((part_num + 1))
-                fi
+              rm -f "${base}.zip" "${base}".z*
+              zip -q -s 95m "${base}.zip" -j "$basefull"
+              shopt -s nullglob
+              part_count=0
+              for zpart in "${base}.zip" "${base}".z*; do
+                [ -f "$zpart" ] && part_count=$((part_count + 1))
               done
-              part_count=$(ls -1 "${base}part"*.zip 2>/dev/null | wc -l)
               rm -f "$basefull"
               if [ -f "${base}.json" ]; then
                 python3 -c "import json,sys; f=open(sys.argv[1],'r'); d=json.load(f); f.close(); d['split']=True; d['zip']=True; d['parts']=int(sys.argv[2]); d['original_size']=int(sys.argv[3]); d['ext']=sys.argv[4]; f=open(sys.argv[1],'w'); json.dump(d,f,indent=2); f.close()" "${base}.json" "$part_count" "$size" "$ext"
               fi
-              echo "Split and zipped into $part_count parts"
+              echo "Multi-volume zip: $part_count parts"
             )
           fi
         done < <(find downloads -mindepth 2 -maxdepth 2 -type f \( -name '*.mp4' -o -name '*.webm' -o -name '*.mkv' -o -name '*.mp3' \) 2>/dev/null)

@@ -3,12 +3,12 @@ export function escapeRegex(s: string): string {
 }
 
 export function partSortKey(name: string): number {
-  const m = name.match(/\.z(\d+)$/i);
-  if (m) return parseInt(m[1], 10);
   const mp = name.match(/part(\d{2})\.zip$/i);
   if (mp) return parseInt(mp[1], 10);
-  if (name.toLowerCase().endsWith('.zip')) return 1_000_000;
-  return 0;
+  const m = name.match(/\.z(\d+)$/i);
+  if (m) return parseInt(m[1], 10);
+  if (name.toLowerCase().endsWith('.zip')) return 0;
+  return 999;
 }
 
 export type SplitPartDownload = {
@@ -38,9 +38,7 @@ export function listSplitPartFiles(
         const dParent = di > 0 ? d.path.slice(0, di) : d.path;
         if (dParent !== stemParent) return false;
       }
-      return (
-        d.name === `${baseName}.zip` || splitSpanRe.test(d.name) || partChunkRe.test(d.name)
-      );
+      return d.name === `${baseName}.zip` || splitSpanRe.test(d.name) || partChunkRe.test(d.name);
     })
     .sort((a, b) => partSortKey(a.name) - partSortKey(b.name));
 }

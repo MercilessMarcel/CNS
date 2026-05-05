@@ -7,6 +7,7 @@ import { listSplitPartFiles, type SplitPartDownload } from '../lib/splitParts';
 import { fa } from '../lib/i18n';
 import { formatSize } from '../lib/useArchive';
 import { useBodyScrollLock } from '../lib/useBodyScrollLock';
+import { logger } from '../lib/logger';
 
 function stripRepoPath(s: string) {
   return s.replace(/^downloads\//i, '').replace(/\\/g, '/');
@@ -44,7 +45,33 @@ export function PartsModal({ item, onClose }: PartsModalProps) {
     if (downloadingPart) return;
     setDownloadingPart(part.path);
     try {
-      const blob = await github.downloadFileAsBlob(part.sha, part.path);
+      const preflight = await github.preflightDownload(part.path);
+      if (!preflight.ok) throw new Error(preflight.reason || 'Download preflight failed');
+      const nativePath = await github.downloadFileViaNative(part.path, part.name);
+      if (nativePath) {
+        try {
+          const slash = Math.max(nativePath.lastIndexOf('/'), nativePath.lastIndexOf('\\'));
+          const dir = slash >= 0 ? nativePath.slice(0, slash) : nativePath;
+          localStorage.setItem('cns_last_download_dir', dir);
+        } catch {
+        }
+        return;
+      }
+      let blob: Blob | null = null;
+      let lastErr: unknown = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          blob = await github.downloadFileAsBlob(part.sha, part.path);
+          break;
+        } catch (err) {
+          lastErr = err;
+          if (attempt < 2) {
+            const jitter = 280 + Math.floor(Math.random() * 520);
+            await new Promise((resolve) => setTimeout(resolve, jitter * (attempt + 1)));
+          }
+        }
+      }
+      if (!blob) throw lastErr instanceof Error ? lastErr : new Error('Download failed');
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -54,6 +81,7 @@ export function PartsModal({ item, onClose }: PartsModalProps) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
+      logger.error('[PartsModal] part download failed', { error: err, path: part.path, name: part.name });
       window.alert(toPersianErrorMessage(err));
     } finally {
       setDownloadingPart(null);
@@ -70,7 +98,7 @@ export function PartsModal({ item, onClose }: PartsModalProps) {
     const loadParts = async () => {
       setLoading(true);
       try {
-        const downloads = await github.getDownloads();
+        const downloads = await github.getDownloads(true);
         setParts(listSplitPartFiles(item.path, downloads));
       } catch {
         setParts([]);

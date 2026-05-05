@@ -238,8 +238,9 @@ export function useArchive({ refreshKey = 0, pollIntervalMs = 30000, enabled = t
           const originalExt = metadata.ext || 'mp4';
           const isV = ['mp4', 'webm', 'mkv', 'mov'].includes(originalExt);
           const isA = ['mp3', 'm4a', 'wav', 'ogg', 'flac'].includes(originalExt);
+          const baseOnly = base.includes('/') ? base.slice(base.lastIndexOf('/') + 1) : base;
           return {
-            name: `${base}.${originalExt}`,
+            name: `${baseOnly}.${originalExt}`,
             path: item.path,
             sha: item.sha,
             size: metadata.original_size || 0,
