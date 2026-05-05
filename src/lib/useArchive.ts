@@ -19,6 +19,7 @@ export interface ArchiveItem {
     uploader?: string;
     downloaded_at?: string;
     upload_date?: string;
+    original_url?: string;
     thumbnail?: string;
     split?: boolean;
     zip?: boolean;
