@@ -246,7 +246,7 @@ jobs:
         fi
 
         VIDEO_FMTSEL="$QUALITY_OPT"
-        VIDEO_EX="--embed-subs --sub-langs all"
+        VIDEO_EX="--embed-subs --sub-langs all,-live_chat"
 
         if [ "$FORMAT" = "mp3" ] || [ "$QUALITY" = "audio" ]; then
           OUTPUT_TEMPLATE="downloads/%(title)s--%(id)s/%(title)s--%(id)s.%(ext)s"
